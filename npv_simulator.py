@@ -1,5 +1,3 @@
-# coding: utf-8
-
 # %%
 
 
@@ -22,7 +20,8 @@ class NPVSimulator:
         Initialize the NPV simulator with a configuration dictionary.
 
         Args:
-        config (dict): Configuration parameters for the simulation."""
+        config (dict): Configuration parameters for the simulation.
+        """
         self.config = config
 
     def run(self, count: int, random_seed: int = 42):
@@ -43,7 +42,6 @@ class NPVSimulator:
         vpp_controller_cost = self.config["vpp_controller_cost"]
         reserve_market_yield = self.config["reserve_market_yield"]
         load_shifting_savings = self.config["load_shifting_savings"]
-        bsp_fee = self.config["bsp_fee"]
         site_mean_power = self.config["site_mean_power"]
         vpp_total_power = self.config["vpp_total_power"]
         discount_rate = self.config["discount_rate"]
@@ -68,6 +66,11 @@ class NPVSimulator:
             self.config["spot_price_multiplier_max"],
             count,
         )
+        bsp_fee = np.random.uniform(
+            self.config["bsp_fee_min"],
+            self.config["bsp_fee_max"],
+            count,
+        )
 
         # Calculate cash flows
         cash_flows = np.zeros((count, n_years + 1))
@@ -89,8 +92,6 @@ class NPVSimulator:
             total_revenue = reserve_market_revenue + load_shifting_revenue
             cash_flows[:, year] = total_revenue * (1 - bsp_fee)
 
-        print(cash_flows[0, :])
-        print(spot_price_multiplier[0])
         # Calculate NPV
         for i in range(count):
             out[i] = npf.npv(discount_rate, cash_flows[i])
@@ -99,32 +100,44 @@ class NPVSimulator:
 
 
 # %%
+def main():
+    config = {
+        "n_years": 10,
+        "battery_capacity_cost": 200,  # Cost per kWh
+        "battery_installation_cost": 1000,  # Installation cost per site
+        "vpp_controller_cost": 1000,  # Cost for VPP controller per
+        "reserve_market_yield": 108000,  # Yield from reserve market €/MW/year
+        "load_shifting_savings": (30 * 2 + 15 * 2)
+        * 365,  # Savings from load shifting €/MW/year
+        "bsp_fee_min": 0.10,  # BSP share of revenue
+        "bsp_fee_max": 0.25,
+        "site_mean_power": 4.5,  # Mean power per site in kW
+        "vpp_total_power": 1000,  # Total power of the VPP in kW
+        "discount_rate": 0.08,  # Discount rate for NPV calculation
+        "reserve_price_multiplier_min": -0.5,  # Min multiplier for reserve market
+        "reserve_price_multiplier_max": 0.2,  # Max multiplier for reserve market
+        "spot_price_multiplier_min": -0.2,  # Min multiplier for spot price
+        "spot_price_multiplier_max": 0.2,  # Max multiplier for spot price
+    }
 
-config = {
-    "n_years": 10,
-    "battery_capacity_cost": 200,  # Cost per kWh
-    "battery_installation_cost": 1000,  # Installation cost per site
-    "vpp_controller_cost": 1000,  # Cost for VPP controller per
-    "reserve_market_yield": 108000,  # Yield from reserve market €/MW/year
-    "load_shifting_savings": (30 * 2 + 15 * 2)
-    * 365,  # Savings from load shifting €/MW/year
-    "bsp_fee": 0.20,  # BSP share of revenue
-    "site_mean_power": 4.5,  # Mean power per site in kW
-    "vpp_total_power": 1000,  # Total power of the VPP in kW
-    "discount_rate": 0.08,  # Discount rate for NPV calculation
-    "reserve_price_multiplier_min": -0.5,  # Min multiplier for reserve market
-    "reserve_price_multiplier_max": 0.2,  # Max multiplier for reserve market
-    "spot_price_multiplier_min": -0.2,  # Min multiplier for spot price
-    "spot_price_multiplier_max": 0.2,  # Max multiplier for spot price
-}
+    simulator = NPVSimulator(config)
+    results = simulator.run(count=3000000)
+    print(f"Mean NPV: {np.mean(results)}")
+    print(f"Standard Deviation of NPV: {np.std(results)}")
+    print(f"Minimum NPV: {np.min(results)}")
+    print(f"Maximum NPV: {np.max(results)}")
+    print(f"5th Percentile NPV: {np.percentile(results, 5)}")
+    print(f"95th Percentile NPV: {np.percentile(results, 95)}")
 
-simulator = NPVSimulator(config)
-results = simulator.run(count=3000000)
+    plt.figure(figsize=(10, 6))
+    plt.hist(results, bins=500, density=True)
+    plt.xlabel("NPV (€)")
+    plt.ylabel("Density")
+    plt.show()
 
-# %%
-plt.figure(figsize=(10, 6))
-plt.hist(results, bins=500, density=True)
-plt.show()
+
+if __name__ == "__main__":
+    main()
 
 # %%
 """
