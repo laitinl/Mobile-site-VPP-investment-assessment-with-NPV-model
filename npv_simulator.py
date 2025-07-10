@@ -45,6 +45,7 @@ class NPVSimulator:
         site_mean_power = self.config["site_mean_power"]
         vpp_total_power = self.config["vpp_total_power"]
         discount_rate = self.config["discount_rate"]
+        tax_rate = self.config["tax_rate"]
 
         # Derived parameters
         n_sites = vpp_total_power // site_mean_power
@@ -54,6 +55,7 @@ class NPVSimulator:
             + n_sites * battery_installation_cost
             + n_sites * vpp_controller_cost
         )
+        deprecation = investment_cost / n_years
 
         # Sampled parameters
         reserve_price_multiplier = np.random.uniform(
@@ -89,8 +91,13 @@ class NPVSimulator:
                 * vpp_total_power
                 / 1000
             )
+
             total_revenue = reserve_market_revenue + load_shifting_revenue
-            cash_flows[:, year] = total_revenue * (1 - bsp_fee)
+            ebit = total_revenue * (1 - bsp_fee) - deprecation
+
+            net_income = ebit
+            net_income[net_income > 0] -= tax_rate * net_income[net_income > 0]
+            cash_flows[:, year] = net_income + deprecation
 
         # Calculate NPV
         for i in range(count):
@@ -118,6 +125,7 @@ def main():
         "reserve_price_multiplier_max": 0.2,  # Max multiplier for reserve market
         "spot_price_multiplier_min": -0.2,  # Min multiplier for spot price
         "spot_price_multiplier_max": 0.2,  # Max multiplier for spot price
+        "tax_rate": 0.2,  # Tax rate for NPV calculation
     }
 
     simulator = NPVSimulator(config)
@@ -133,6 +141,16 @@ def main():
     plt.hist(results, bins=500, density=True)
     plt.xlabel("NPV (€)")
     plt.ylabel("Density")
+
+    # t = np.linspace(np.min(results), np.max(results), 1000)
+    # plt.plot(
+    #    t,
+    #    np.exp(-0.5 * ((t - np.mean(results)) / np.std(results)) ** 2)
+    #    / (np.std(results) * np.sqrt(2 * np.pi)),
+    #    color="red",
+    #    label="Normal Distribution Fit",
+    # )
+    # plt.legend()
     plt.show()
 
 
