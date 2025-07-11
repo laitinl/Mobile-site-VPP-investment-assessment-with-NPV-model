@@ -24,6 +24,22 @@ class NPVSimulator:
         """
         self.config = config
 
+    def calculate_npv(self, cash_flows: np.ndarray, discount_rate: float) -> np.ndarray:
+        """
+        Calculate the Net Present Value (NPV) for given cash flows and discount rate.
+
+        Args:
+        cash_flows (np.ndarray): Array of cash flows.
+        discount_rate (float): Discount rate for NPV calculation.
+
+        Returns:
+        np.ndarray: NPV values.
+        """
+        years = np.arange(0, self.config["n_years"] + 1)
+        cash_flows = cash_flows * (1 + discount_rate) ** -years
+        npvs = np.cumsum(cash_flows, axis=1)
+        return npvs
+
     def run(self, count: int, random_seed: int = 42):
         """
         Run the NPV simulation.
@@ -33,7 +49,6 @@ class NPVSimulator:
         random_state (int): Seed for random number generation.
         """
         np.random.seed(random_seed)
-        out = np.zeros((count, 1))
 
         # Fixed parameters
         n_years = self.config["n_years"]
@@ -100,8 +115,7 @@ class NPVSimulator:
             cash_flows[:, year] = net_income + deprecation
 
         # Calculate NPV
-        for i in range(count):
-            out[i] = npf.npv(discount_rate, cash_flows[i])
+        out = self.calculate_npv(cash_flows, discount_rate)
 
         return out
 
@@ -130,6 +144,7 @@ def main():
 
     simulator = NPVSimulator(config)
     results = simulator.run(count=3000000)
+    results = results[:, -1]
     print(f"Mean NPV: {np.mean(results)}")
     print(f"Standard Deviation of NPV: {np.std(results)}")
     print(f"Minimum NPV: {np.min(results)}")
