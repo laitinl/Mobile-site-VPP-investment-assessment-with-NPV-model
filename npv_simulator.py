@@ -1,11 +1,5 @@
 # %%
-
-
 import numpy as np
-import numpy_financial as npf
-import pandas as pd
-import random
-from astetik import hist
 import matplotlib.pyplot as plt
 
 
@@ -144,28 +138,39 @@ def main():
 
     simulator = NPVSimulator(config)
     results = simulator.run(count=3000000)
-    results = results[:, -1]
-    print(f"Mean NPV: {np.mean(results)}")
-    print(f"Standard Deviation of NPV: {np.std(results)}")
-    print(f"Minimum NPV: {np.min(results)}")
-    print(f"Maximum NPV: {np.max(results)}")
-    print(f"5th Percentile NPV: {np.percentile(results, 5)}")
-    print(f"95th Percentile NPV: {np.percentile(results, 95)}")
+    npv_last_year = results[:, -1]
+    print(f"Mean NPV: {np.mean(npv_last_year)}")
+    print(f"Standard Deviation of NPV: {np.std(npv_last_year)}")
+    print(f"Minimum NPV: {np.min(npv_last_year)}")
+    print(f"Maximum NPV: {np.max(npv_last_year)}")
+    print(f"5th Percentile NPV: {np.percentile(npv_last_year, 5)}")
+    print(f"95th Percentile NPV: {np.percentile(npv_last_year, 95)}")
 
     plt.figure(figsize=(10, 6))
-    plt.hist(results, bins=500, density=True)
+    plt.hist(npv_last_year, bins=500, density=True)
     plt.xlabel("NPV (€)")
     plt.ylabel("Density")
+    plt.show()
 
-    # t = np.linspace(np.min(results), np.max(results), 1000)
-    # plt.plot(
-    #    t,
-    #    np.exp(-0.5 * ((t - np.mean(results)) / np.std(results)) ** 2)
-    #    / (np.std(results) * np.sqrt(2 * np.pi)),
-    #    color="red",
-    #    label="Normal Distribution Fit",
-    # )
-    # plt.legend()
+    percentiles_npv = np.percentile(results, [2.5, 50, 97.5], axis=0)
+    plt.figure(figsize=(10, 6))
+    plt.plot(
+        np.arange(0, config["n_years"] + 1),
+        percentiles_npv[1],
+        label="Median",
+        color="blue",
+    )
+    plt.plot(
+        np.arange(0, config["n_years"] + 1),
+        percentiles_npv[::2, :].T,
+        "--",
+        label="Confidence Interval 95%",
+        color="blue",
+    )
+    plt.xlabel("Year")
+    plt.ylabel("NPV (€)")
+    plt.grid(axis="y", alpha=0.5)
+    plt.legend()
     plt.show()
 
 
