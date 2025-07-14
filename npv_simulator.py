@@ -138,7 +138,9 @@ def main():
         "Investment_size": np.array([1, 4, 1, 4, 1, 4]),  # Extra capacity hours
         "FCR weight": np.array([0, 0, 1, 0.5, 1, 0.5]),  # Weight of FCR revenues
         "aFRR weight": np.array([0, 0, 0, 0.7, 0, 0.7]),  # Weight of aFRR revenues
-        "LS weight": np.array([1, 1, 0, 0, 0, 0]),  # Weight of load shifting revenues
+        "LS weight": np.array(
+            [0.5, 1, 0.5, 1, 0.5, 1]
+        ),  # Weight of load shifting revenues
         "Controller": np.array(
             [False, False, False, False, True, True]
         ),  # Whether a VPP controller is used
@@ -167,7 +169,7 @@ def main():
 
     simulator = NPVSimulator(cases, config)
     results = simulator.run(count=3000000)
-    scenario = 4
+    scenario = 3
     npv_last_year = results[:, -1, scenario]
     print(f"Mean NPV: {np.mean(npv_last_year)}")
     print(f"Standard Deviation of NPV: {np.std(npv_last_year)}")
@@ -201,6 +203,18 @@ def main():
     plt.ylabel("NPV (€)")
     plt.grid(axis="y", alpha=0.5)
     plt.legend()
+    plt.show()
+
+    plt.figure(figsize=(10, 6))
+    plt.boxplot(
+        results[:, -1, :],
+        tick_labels=[f"Scenario {i+1}" for i in range(results.shape[2])],
+        patch_artist=True,
+        boxprops=dict(facecolor="lightblue", color="blue"),
+        medianprops=dict(color="blue"),
+        whiskerprops=dict(color="black"),
+        capprops=dict(color="black"),
+    )
     plt.show()
 
 
