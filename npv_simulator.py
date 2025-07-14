@@ -157,7 +157,7 @@ def main():
         * 365,  # Savings from load shifting €/MW/year
         "bsp_fee_min": 0.10,  # BSP share of revenue
         "bsp_fee_max": 0.25,
-        "site_mean_power": 8,  # Mean power per site in kW
+        "site_mean_power": 4.5,  # Mean power per site in kW
         "vpp_total_power": 1000,  # Total power of the VPP in kW
         "discount_rate": 0.08,  # Discount rate for NPV calculation
         "reserve_price_multiplier_min": -0.5,  # Min multiplier for reserve market
@@ -205,16 +205,54 @@ def main():
     plt.legend()
     plt.show()
 
+    # Boxplot for different site mean power scenarios
+    positions = np.arange(1, len(cases["Investment_size"]) * 3, 3)
     plt.figure(figsize=(10, 6))
     plt.boxplot(
         results[:, -1, :],
-        tick_labels=[f"Scenario {i+1}" for i in range(results.shape[2])],
         patch_artist=True,
         boxprops=dict(facecolor="lightblue", color="blue"),
         medianprops=dict(color="blue"),
-        whiskerprops=dict(color="black"),
-        capprops=dict(color="black"),
+        whiskerprops=dict(color="blue"),
+        capprops=dict(color="blue"),
+        positions=positions + 0.2,
+        label="4.5 kW Site Mean Power",
     )
+
+    config["site_mean_power"] = 8
+    simulator = NPVSimulator(cases, config)
+    results = simulator.run(count=3000000)
+    plt.boxplot(
+        results[:, -1, :],
+        patch_artist=True,
+        boxprops=dict(facecolor="plum", color="purple"),
+        medianprops=dict(color="purple"),
+        whiskerprops=dict(color="purple"),
+        capprops=dict(color="purple"),
+        positions=positions + 1,
+        label="8 kW Site Mean Power",
+    )
+
+    config["site_mean_power"] = 2.5
+    simulator = NPVSimulator(cases, config)
+    results = simulator.run(count=3000000)
+    plt.boxplot(
+        results[:, -1, :],
+        patch_artist=True,
+        boxprops=dict(facecolor="lightgreen", color="green"),
+        medianprops=dict(color="green"),
+        whiskerprops=dict(color="green"),
+        capprops=dict(color="green"),
+        positions=positions + 1.8,
+        label="2.5 kW Site Mean Power",
+    )
+    plt.xticks(
+        positions + 1,
+        [f"Scenario {i + 1}" for i in range(len(cases["Investment_size"]))],
+    )
+    plt.ylabel("NPV (€)")
+    plt.grid(axis="y", alpha=0.5)
+    plt.legend()
     plt.show()
 
 
