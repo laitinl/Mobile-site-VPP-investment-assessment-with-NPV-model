@@ -9,7 +9,7 @@ class NPVSimulator:
     virtual power plant (VPP) battery investment scenarios.
     """
 
-    def __init__(self, cases: dict, config: dict):
+    def __init__(self, cases: dict[str, np.ndarray], config: dict):
         """
         Initialize the NPV simulator with a configuration dictionary.
 
@@ -60,7 +60,6 @@ class NPVSimulator:
         site_mean_power = self.config["site_mean_power"]
         vpp_total_power = self.config["vpp_total_power"]
         discount_rate = self.config["discount_rate"]
-        tax_rate = self.config["tax_rate"]
 
         # Derived parameters
         n_sites = vpp_total_power // site_mean_power
@@ -72,7 +71,6 @@ class NPVSimulator:
             + n_sites * battery_installation_cost
             + n_sites * vpp_controller_cost * self.cases["Controller"]
         )
-        deprecation = investment_cost / n_years
         reserve_market_yield = (
             self.cases["FCR weight"] * fcr_yield
             + self.cases["aFRR weight"] * afrr_yield
@@ -116,15 +114,9 @@ class NPVSimulator:
                 / 1000
             )
 
-            total_revenue = reserve_market_revenue + load_shifting_revenue
-            ebit = (
-                total_revenue * (1 - bsp_fee[:, np.newaxis])
-                - deprecation[np.newaxis, :]
-            )
-
-            net_income = ebit
-            net_income[net_income > 0] -= tax_rate * net_income[net_income > 0]
-            cash_flows[:, year, :] = net_income + deprecation[np.newaxis, :]
+            cash_flows[:, year, :] = (
+                reserve_market_revenue + load_shifting_revenue
+            ) * (1 - bsp_fee[:, np.newaxis])
 
         # Calculate NPV
         out = self.calculate_npv(cash_flows, discount_rate)
@@ -151,12 +143,11 @@ def main():
         "battery_capacity_cost": 200,  # Cost per kWh
         "battery_installation_cost": 1000,  # Installation cost per site
         "vpp_controller_cost": 1000,  # Cost for VPP controller per
-        "fcr_yield": 108000,  # Yield from FCR-D up market €/MW/year
-        "afrr_yield": 204000,  # Yield from aFRR market €/MW/year
-        "load_shifting_savings": (30 * 2 + 15 * 2)
-        * 365,  # Savings from load shifting €/MW/year
-        "bsp_fee_min": 0.10,  # BSP share of revenue
-        "bsp_fee_max": 0.25,
+        "fcr_yield": 109000 + 118000,  # Yield from FCR-D up and down market €/MW/year
+        "afrr_yield": 176000 + 141000,  # Yield from aFRR up and down market €/MW/year
+        "load_shifting_savings": (50 * 4) * 365,  # Savings from load shifting €/MW/year
+        "bsp_fee_min": 0.1,  # Min BSP share of revenue
+        "bsp_fee_max": 0.3,  # Max BSP share of revenue
         "site_mean_power": 4.5,  # Mean power per site in kW
         "vpp_total_power": 1000,  # Total power of the VPP in kW
         "discount_rate": 0.08,  # Discount rate for NPV calculation
@@ -164,7 +155,6 @@ def main():
         "reserve_price_multiplier_max": 0.2,  # Max multiplier for reserve market
         "spot_price_multiplier_min": -0.2,  # Min multiplier for spot price
         "spot_price_multiplier_max": 0.2,  # Max multiplier for spot price
-        "tax_rate": 0.2,  # Tax rate for NPV calculation
     }
 
     simulator = NPVSimulator(cases, config)
