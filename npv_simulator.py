@@ -1,6 +1,7 @@
 # %%
 import numpy as np
 import matplotlib.pyplot as plt
+from betapert import pert
 
 
 class NPVSimulator:
@@ -52,7 +53,9 @@ class NPVSimulator:
         # Fixed parameters
         n_years = self.config["n_years"]
         battery_capacity_cost = self.config["battery_capacity_cost"]
-        battery_installation_cost = self.config["battery_installation_cost"]
+        fixed_battery_installation_cost, variable_battery_installation_cost = (
+            self.config["battery_installation_cost"]
+        )
         vpp_controller_cost = self.config["vpp_controller_cost"]
         fcr_yield = self.config["fcr_yield"]
         afrr_yield = self.config["afrr_yield"]
@@ -60,6 +63,7 @@ class NPVSimulator:
         site_mean_power = self.config["site_mean_power"]
         vpp_total_power = self.config["vpp_total_power"]
         discount_rate = self.config["discount_rate"]
+        connectivity_cost = self.config["connectivity_cost"]
 
         # Derived parameters
         n_sites = vpp_total_power // site_mean_power
@@ -68,30 +72,25 @@ class NPVSimulator:
         )  # Assuming battery capacity equals VPP total power for one hour
         investment_cost = (
             battery_capacity * battery_capacity_cost
-            + n_sites * battery_installation_cost
+            + n_sites * fixed_battery_installation_cost
+            + battery_capacity * variable_battery_installation_cost
             + n_sites * vpp_controller_cost * self.cases["Controller"]
         )
+        om_cost = investment_cost * self.config["o&m_cost"]
+        annual_cost = om_cost + connectivity_cost
         reserve_market_yield = (
             self.cases["FCR weight"] * fcr_yield
             + self.cases["aFRR weight"] * afrr_yield
         )
 
         # Sampled parameters
-        reserve_price_multiplier = np.random.uniform(
-            self.config["reserve_price_multiplier_min"],
-            self.config["reserve_price_multiplier_max"],
-            count,
+        reserve_price_multiplier = pert(
+            *self.config["reserve_price_multiplier_dist"]
+        ).rvs(size=count)
+        spot_price_multiplier = pert(*self.config["spot_price_multiplier_dist"]).rvs(
+            size=count
         )
-        spot_price_multiplier = np.random.uniform(
-            self.config["spot_price_multiplier_min"],
-            self.config["spot_price_multiplier_max"],
-            count,
-        )
-        bsp_fee = np.random.uniform(
-            self.config["bsp_fee_min"],
-            self.config["bsp_fee_max"],
-            count,
-        )
+        bsp_fee = pert(*self.config["bsp_fee_dist"]).rvs(size=count)
 
         # Calculate cash flows
         cash_flows = np.zeros(
@@ -113,10 +112,9 @@ class NPVSimulator:
                 * vpp_total_power
                 / 1000
             )
-
             cash_flows[:, year, :] = (
                 reserve_market_revenue + load_shifting_revenue
-            ) * (1 - bsp_fee[:, np.newaxis])
+            ) * (1 - bsp_fee[:, np.newaxis]) - annual_cost[np.newaxis, :]
 
         # Calculate NPV
         out = self.calculate_npv(cash_flows, discount_rate)
@@ -128,10 +126,10 @@ class NPVSimulator:
 def main():
     cases = {
         "Investment_size": np.array([1, 4, 1, 4, 1, 4]),  # Extra capacity hours
-        "FCR weight": np.array([0, 0, 1, 0.5, 1, 0.5]),  # Weight of FCR revenues
-        "aFRR weight": np.array([0, 0, 0, 0.7, 0, 0.7]),  # Weight of aFRR revenues
+        "FCR weight": np.array([0, 0, 1, 0, 1, 0]),  # Weight of FCR revenues
+        "aFRR weight": np.array([0, 0, 0, 1, 0, 1]),  # Weight of aFRR revenues
         "LS weight": np.array(
-            [0.5, 1, 0.5, 1, 0.5, 1]
+            [0.25, 1, 0, 0, 0, 0]
         ),  # Weight of load shifting revenues
         "Controller": np.array(
             [False, False, False, False, True, True]
@@ -140,21 +138,35 @@ def main():
 
     config = {
         "n_years": 10,
-        "battery_capacity_cost": 200,  # Cost per kWh
-        "battery_installation_cost": 1000,  # Installation cost per site
-        "vpp_controller_cost": 1000,  # Cost for VPP controller per
+        "battery_capacity_cost": 100,  # Cost per kWh
+        "battery_installation_cost": (
+            500,
+            25,
+        ),  # Installation cost per site (fixed cost, cost per kWh)
+        "vpp_controller_cost": 1500,  # Cost for VPP controller per
         "fcr_yield": 109000 + 118000,  # Yield from FCR-D up and down market €/MW/year
         "afrr_yield": 176000 + 141000,  # Yield from aFRR up and down market €/MW/year
-        "load_shifting_savings": (50 * 4) * 365,  # Savings from load shifting €/MW/year
-        "bsp_fee_min": 0.1,  # Min BSP share of revenue
-        "bsp_fee_max": 0.3,  # Max BSP share of revenue
+        "load_shifting_savings": (40 * 4) * 365,  # Savings from load shifting €/MW/year
+        "connectivity_cost": 240,  # VPP connectivity cost per year
+        "o&m_cost": 0.02,  # O&M cost as a fraction of investment cost
+        "bsp_fee_dist": (
+            0.1,
+            0.2,
+            0.3,
+        ),  # BSP fee distribution parameters (min, mode, max)
         "site_mean_power": 4.5,  # Mean power per site in kW
         "vpp_total_power": 1000,  # Total power of the VPP in kW
-        "discount_rate": 0.08,  # Discount rate for NPV calculation
-        "reserve_price_multiplier_min": -0.5,  # Min multiplier for reserve market
-        "reserve_price_multiplier_max": 0.2,  # Max multiplier for reserve market
-        "spot_price_multiplier_min": -0.2,  # Min multiplier for spot price
-        "spot_price_multiplier_max": 0.2,  # Max multiplier for spot price
+        "discount_rate": 0.057,  # Discount rate for NPV calculation
+        "reserve_price_multiplier_dist": (
+            -0.5,
+            0.2,
+            0.5,
+        ),  # Reserve price multiplier distribution (min, mode, max)
+        "spot_price_multiplier_dist": (
+            -0.1,
+            0.0,
+            0.1,
+        ),  # Spot price multiplier distribution (min, mode, max)
     }
 
     simulator = NPVSimulator(cases, config)
@@ -207,6 +219,7 @@ def main():
         capprops=dict(color="blue"),
         positions=positions + 0.2,
         label="4.5 kW Site Mean Power",
+        showfliers=False,
     )
 
     config["site_mean_power"] = 8
@@ -221,6 +234,7 @@ def main():
         capprops=dict(color="purple"),
         positions=positions + 1,
         label="8 kW Site Mean Power",
+        showfliers=False,
     )
 
     config["site_mean_power"] = 2.5
@@ -235,6 +249,7 @@ def main():
         capprops=dict(color="green"),
         positions=positions + 1.8,
         label="2.5 kW Site Mean Power",
+        showfliers=False,
     )
     plt.xticks(
         positions + 1,
@@ -248,3 +263,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# %%
