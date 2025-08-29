@@ -40,13 +40,16 @@ class NPVSimulator:
         npvs = np.cumsum(cash_flows, axis=1)
         return npvs
 
-    def run(self, count: int, random_seed: int = 42):
+    def run_uncertainty_analysis(self, count: int, random_seed: int = 42) -> np.ndarray:
         """
         Run the NPV simulation.
 
         Args:
         count (int): Number of simulations to run.
         random_state (int): Seed for random number generation.
+
+        Returns:
+        np.ndarray: Array of NPV results for each scenario and year.
         """
         np.random.seed(random_seed)
 
@@ -60,6 +63,7 @@ class NPVSimulator:
         fcr_yield = self.config["fcr_yield"]
         afrr_yield = self.config["afrr_yield"]
         load_shifting_savings = self.config["load_shifting_savings"]
+        peak_shaving_savings_per_site = self.config["peak_shaving_savings_per_site"]
         site_mean_power = self.config["site_mean_power"]
         vpp_total_power = self.config["vpp_total_power"]
         discount_rate = self.config["discount_rate"]
@@ -76,8 +80,11 @@ class NPVSimulator:
             + battery_capacity * variable_battery_installation_cost
             + n_sites * vpp_controller_cost * self.cases["Controller"]
         )
-        om_cost = investment_cost * self.config["o&m_cost"]
-        annual_cost = om_cost + connectivity_cost
+        om_cost = (
+            battery_capacity * battery_capacity_cost
+            + n_sites * vpp_controller_cost * self.cases["Controller"]
+        ) * self.config["o&m_cost"]
+        annual_cost = om_cost + connectivity_cost * n_sites
         reserve_market_yield = (
             self.cases["FCR weight"] * fcr_yield
             + self.cases["aFRR weight"] * afrr_yield
@@ -87,9 +94,12 @@ class NPVSimulator:
         reserve_price_multiplier = pert(
             *self.config["reserve_price_multiplier_dist"]
         ).rvs(size=count)
-        spot_price_multiplier = pert(*self.config["spot_price_multiplier_dist"]).rvs(
-            size=count
-        )
+        spot_volatility_multiplier = pert(
+            *self.config["spot_volatility_multiplier_dist"]
+        ).rvs(size=count)
+        power_charge_multiplier = pert(
+            *self.config["power_charge_multiplier_dist"]
+        ).rvs(size=count)
         bsp_fee = pert(*self.config["bsp_fee_dist"]).rvs(size=count)
 
         # Calculate cash flows
@@ -108,12 +118,17 @@ class NPVSimulator:
             load_shifting_revenue = (
                 self.cases["LS weight"][np.newaxis, :]
                 * load_shifting_savings
-                * (1 + spot_price_multiplier[:, np.newaxis] * (year + 1) / n_years)
+                * (1 + spot_volatility_multiplier[:, np.newaxis] * (year + 1) / n_years)
                 * vpp_total_power
                 / 1000
             )
+            peak_shaving_revenue = (
+                peak_shaving_savings_per_site
+                * n_sites
+                * (1 + power_charge_multiplier[:, np.newaxis] * (year + 1) / n_years)
+            )
             cash_flows[:, year, :] = (
-                reserve_market_revenue + load_shifting_revenue
+                reserve_market_revenue + load_shifting_revenue + peak_shaving_revenue
             ) * (1 - bsp_fee[:, np.newaxis]) - annual_cost[np.newaxis, :]
 
         # Calculate NPV
@@ -147,6 +162,8 @@ def main():
         "fcr_yield": 109000 + 118000,  # Yield from FCR-D up and down market €/MW/year
         "afrr_yield": 176000 + 141000,  # Yield from aFRR up and down market €/MW/year
         "load_shifting_savings": (40 * 4) * 365,  # Savings from load shifting €/MW/year
+        "peak_shaving_savings_per_site": (1.35 * 2)
+        * 12,  # Single site savings from peak shaving €/MW/year
         "connectivity_cost": 240,  # VPP connectivity cost per year
         "o&m_cost": 0.02,  # O&M cost as a fraction of investment cost
         "bsp_fee_dist": (
@@ -154,26 +171,27 @@ def main():
             0.2,
             0.3,
         ),  # BSP fee distribution parameters (min, mode, max)
-        "site_mean_power": 4.5,  # Mean power per site in kW
+        "site_mean_power": 2,  # Mean power per site in kW
         "vpp_total_power": 1000,  # Total power of the VPP in kW
         "discount_rate": 0.057,  # Discount rate for NPV calculation
         "reserve_price_multiplier_dist": (
             -0.5,
-            0.2,
+            -0.2,
             0.5,
         ),  # Reserve price multiplier distribution (min, mode, max)
-        "spot_price_multiplier_dist": (
+        "spot_volatility_multiplier_dist": (
             -0.1,
             0.0,
             0.1,
         ),  # Spot price multiplier distribution (min, mode, max)
+        "power_charge_multiplier_dist": (-0.1, 0.2, 0.96),
     }
 
     simulator = NPVSimulator(cases, config)
-    results = simulator.run(count=3000000)
-    scenario = 3
+    results = simulator.run_uncertainty_analysis(count=3000000)
+    scenario = 2
     npv_last_year = results[:, -1, scenario]
-    print(f"Mean NPV: {np.mean(npv_last_year)}")
+    print(f"Mean NPV: {np.median(npv_last_year)}")
     print(f"Standard Deviation of NPV: {np.std(npv_last_year)}")
     print(f"Minimum NPV: {np.min(npv_last_year)}")
     print(f"Maximum NPV: {np.max(npv_last_year)}")
@@ -218,13 +236,13 @@ def main():
         whiskerprops=dict(color="blue"),
         capprops=dict(color="blue"),
         positions=positions + 0.2,
-        label="4.5 kW Site Mean Power",
+        label="2 kW Site Mean Power",
         showfliers=False,
     )
 
-    config["site_mean_power"] = 8
+    config["site_mean_power"] = 5
     simulator = NPVSimulator(cases, config)
-    results = simulator.run(count=3000000)
+    results = simulator.run_uncertainty_analysis(count=3000000)
     plt.boxplot(
         results[:, -1, :],
         patch_artist=True,
@@ -233,13 +251,13 @@ def main():
         whiskerprops=dict(color="purple"),
         capprops=dict(color="purple"),
         positions=positions + 1,
-        label="8 kW Site Mean Power",
+        label="5 kW Site Mean Power",
         showfliers=False,
     )
 
-    config["site_mean_power"] = 2.5
+    config["site_mean_power"] = 10
     simulator = NPVSimulator(cases, config)
-    results = simulator.run(count=3000000)
+    results = simulator.run_uncertainty_analysis(count=3000000)
     plt.boxplot(
         results[:, -1, :],
         patch_artist=True,
@@ -248,7 +266,7 @@ def main():
         whiskerprops=dict(color="green"),
         capprops=dict(color="green"),
         positions=positions + 1.8,
-        label="2.5 kW Site Mean Power",
+        label="10 kW Site Mean Power",
         showfliers=False,
     )
     plt.xticks(
