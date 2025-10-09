@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from npv_simulator import NPVSimulator
+from src.npv_simulator import NPVSimulator
 
 
 class TestNPVSimulator(unittest.TestCase):
@@ -39,12 +39,12 @@ class TestNPVSimulator(unittest.TestCase):
 
     def test_run(self):
         simulator = NPVSimulator(self.cases, self.config)
-        results = simulator.run(count=100)
+        results = simulator.run_uncertainty_analysis(count=100)
         self.assertEqual(results.shape[2], len(self.cases["Investment_size"]))
 
     def test_npv_scenario_5(self):
         simulator = NPVSimulator(self.cases, self.config)
-        results = simulator.run(count=1000, random_seed=42)
+        results = simulator.run_uncertainty_analysis(count=1000, random_seed=42)
 
         np.random.seed(42)
 
