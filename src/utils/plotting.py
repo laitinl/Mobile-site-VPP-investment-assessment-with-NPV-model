@@ -2,6 +2,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+# Default font sizes tuned for A4 / journal figures
+FONT_SIZES = {
+    "title": 16,
+    "label": 14,
+    "ticks": 12,
+    "legend": 12,
+    "row_label": 14,
+}
+
+
 def plot_cumulative_npv(results, scenario, n_years):
     percentiles_npv = np.percentile(results[:, :, scenario], [2.5, 50, 97.5], axis=0)
     plt.figure(figsize=(10, 6))
@@ -18,10 +28,12 @@ def plot_cumulative_npv(results, scenario, n_years):
         label="Confidence Interval 95%",
         color="blue",
     )
-    plt.xlabel("Year")
-    plt.ylabel("NPV (€)")
-    plt.grid(axis="y", alpha=0.5)
-    plt.legend()
+    ax = plt.gca()
+    ax.set_xlabel("Year", fontsize=FONT_SIZES["label"])
+    ax.set_ylabel("NPV (€)", fontsize=FONT_SIZES["label"])
+    ax.grid(axis="y", alpha=0.5)
+    ax.tick_params(axis="both", labelsize=FONT_SIZES["ticks"])
+    ax.legend(fontsize=FONT_SIZES["legend"])
     plt.show()
 
 
@@ -48,19 +60,21 @@ def plot_npv_boxplots(site_powers, results_with_different_site_power, scenarios)
             showfliers=False,
         )
 
-    plt.xticks(
-        positions + 1,
-        [f"Scenario {s}" for s in scenarios],
+    ax = plt.gca()
+    ax.set_xticks(positions + 1)
+    ax.set_xticklabels(
+        [f"Scenario {s}" for s in scenarios], fontsize=FONT_SIZES["ticks"]
     )
-    plt.ylabel("NPV (€)")
-    plt.grid(axis="y", alpha=0.5)
-    plt.legend()
+    ax.set_ylabel("NPV (€)", fontsize=FONT_SIZES["label"])
+    ax.grid(axis="y", alpha=0.5)
+    ax.tick_params(axis="y", labelsize=FONT_SIZES["ticks"])
+    ax.legend(fontsize=FONT_SIZES["legend"])
     plt.show()
 
 
 def plot_npv_hist_grid(site_powers, results_with_different_site_power, scenarios):
     n_site_powers = len(site_powers)
-    fig, axs = plt.subplots(n_site_powers, len(scenarios), figsize=(15, 10))
+    _, axs = plt.subplots(n_site_powers, len(scenarios), figsize=(15, 10))
 
     # Handle case where there's only one site power (axs would be 1D)
     if n_site_powers == 1:
@@ -74,11 +88,16 @@ def plot_npv_hist_grid(site_powers, results_with_different_site_power, scenarios
 
             # Add column titles (scenarios) only on the top row
             if j == 0:
-                ax.set_title(f"Scenario {scenario}", fontweight="bold", pad=20)
+                ax.set_title(
+                    f"Scenario {scenario}",
+                    fontweight="bold",
+                    pad=20,
+                    fontsize=FONT_SIZES["title"],
+                )
 
             # Add ylabel only on the leftmost column
             if i == 0:
-                ax.set_ylabel("Density")
+                ax.set_ylabel("Density", fontsize=FONT_SIZES["label"])
 
             # Add row titles (site powers) only on the leftmost column
             if i == 0:
@@ -90,71 +109,146 @@ def plot_npv_hist_grid(site_powers, results_with_different_site_power, scenarios
                     rotation=90,
                     verticalalignment="center",
                     fontweight="bold",
-                    fontsize=12,
+                    fontsize=FONT_SIZES["row_label"],
                 )
 
             # Add xlabel only on the bottom row
             if j == n_site_powers - 1:
-                ax.set_xlabel("NPV (€)")
+                ax.set_xlabel("NPV (€)", fontsize=FONT_SIZES["label"])
+
+            # tick sizes
+            ax.tick_params(axis="both", labelsize=FONT_SIZES["ticks"])
 
     plt.tight_layout()
     plt.show()
 
 
 def plot_npv_hist_overlaid(site_powers, results_with_different_site_power, scenarios):
-    n_scenarios = len(scenarios)
-    fig, axs = plt.subplots(1, n_scenarios, figsize=(15, 5))
+    """Plot overlaid histograms in a 2D grid.
 
-    # Handle case where there's only one scenario (axs would be 0D)
-    if n_scenarios == 1:
-        axs = [axs]
+    Grid layout:
+      - rows correspond to numeric scenario groups (e.g. 1,2,3)
+      - columns correspond to letter cases (e.g. a,b,c)
 
-    # Generate distinct colors for each site power
+    `scenarios` is expected to contain labels like ['1a','1b','1c','2a',...].
+    For each grid cell we look up the matching scenario and plot overlaid
+    histograms for all provided `results_with_different_site_power`.
+    """
+    import re
+
+    # Extract numeric row keys and letter column keys from scenario strings
+    parsed = [re.match(r"(\d+)(\D+)", s) for s in scenarios]
+    numbers = []
+    letters = []
+    for m in parsed:
+        if m:
+            numbers.append(m.group(1))
+            letters.append(m.group(2))
+    # Keep original order but unique
+    numbers = list(dict.fromkeys(numbers))
+    letters = list(dict.fromkeys(letters))
+
+    n_rows = len(numbers)
+    n_cols = len(letters)
+
+    # Share x-axis within each column so column cells use the same x-scale and ticks
+    fig, axs = plt.subplots(
+        n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows), squeeze=False, sharex="col"
+    )
+
+    # Colors per site power
     colors = plt.cm.get_cmap("tab10")(np.linspace(0, 1, len(site_powers)))
 
-    # Store handles and labels for the legend (only need from first subplot)
+    # Legend handles collected from the first valid cell
     legend_handles = []
     legend_labels = []
 
-    for i, scenario in enumerate(scenarios):
-        ax = axs[i]
+    for r, num in enumerate(numbers):
+        for c, let in enumerate(letters):
+            ax = axs[r, c]
+            scenario_label = f"{num}{let}"
 
-        # Plot histogram for each site power in the same subplot
-        for j, results in enumerate(results_with_different_site_power):
-            color = colors[j]
-            hist_patch = ax.hist(
-                results[:, -1, i],
-                bins=100,
-                density=True,
-                alpha=0.6,
-                color=color,
-                linewidth=0.5,
-            )
+            # Find the index of scenario_label in provided scenarios
+            try:
+                idx = scenarios.index(scenario_label)
+            except ValueError:
+                # No data for this cell
+                ax.axis("off")
+                continue
 
-            # Collect legend info only from the first subplot
-            if i == 0:
-                legend_handles.append(hist_patch[2][0])  # Get the patch object
-                legend_labels.append(f"{site_powers[j]} kW Site Mean Power")
+            # Plot each site power's histogram into this cell
+            for j, results in enumerate(results_with_different_site_power):
+                color = colors[j]
+                h = ax.hist(
+                    results[:, -1, idx],
+                    bins=100,
+                    density=True,
+                    alpha=0.6,
+                    color=color,
+                )
 
-        ax.set_title(f"Scenario {scenario}", fontweight="bold", pad=15)
-        ax.set_xlabel("NPV (€)")
-        ax.grid(axis="y", alpha=0.5)
+                # Collect legend patch from first valid cell (top-left)
+                if r == 0 and c == 0:
+                    # h[2] is a list of patches; take the first as representative
+                    if len(h) >= 3 and len(h[2]) > 0:
+                        legend_handles.append(h[2][0])
+                        legend_labels.append(f"{site_powers[j]} kW")
 
-        # Add ylabel only on the leftmost subplot
-        if i == 0:
-            ax.set_ylabel("Density")
+            # Column titles: letters (cases) on top row
+            if r == 0:
+                ax.set_title(
+                    f"Case {let}",
+                    fontweight="bold",
+                    pad=10,
+                    fontsize=FONT_SIZES["title"],
+                )
 
-    # Add a single legend for the entire figure at the bottom
-    fig.legend(
-        legend_handles,
-        legend_labels,
-        loc="lower center",
-        bbox_to_anchor=(0.5, -0.05),
-        ncol=len(site_powers),
-        fontsize=10,
-        frameon=True,
-    )
+            # Row titles: scenario numbers on leftmost column
+            if c == 0:
+                ax.text(
+                    -0.25,
+                    0.5,
+                    f"Scenario {num}",
+                    transform=ax.transAxes,
+                    rotation=90,
+                    verticalalignment="center",
+                    fontweight="bold",
+                    fontsize=FONT_SIZES["row_label"],
+                )
+
+            # y label only on leftmost column
+            if c == 0:
+                ax.set_ylabel("Density", fontsize=FONT_SIZES["label"])
+
+            # xlabel only on bottom row
+            if r == n_rows - 1:
+                ax.set_xlabel("NPV (€)", fontsize=FONT_SIZES["label"])
+
+            # make x-tick labels visible for all rows (they're shared per column)
+            ax.tick_params(axis="x", labelbottom=True)
+            # set tick label sizes for both axes
+            ax.tick_params(axis="both", labelsize=FONT_SIZES["ticks"])
+
+            # use scientific notation for both axes (e.g. 120 -> 1.2e2)
+            ax.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
+            ax.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
+
+            ax.grid(axis="y", alpha=0.5)
+
+    # Add single legend under the entire figure
+    if legend_handles:
+        fig.legend(
+            legend_handles,
+            legend_labels,
+            loc="lower center",
+            bbox_to_anchor=(0.5, -0.08),
+            ncol=max(1, len(site_powers)),
+            fontsize=FONT_SIZES["legend"],
+            frameon=True,
+            title="Site Mean Power (applies to all cells)",
+            title_fontsize=FONT_SIZES["label"],
+        )
 
     plt.tight_layout()
-    plt.subplots_adjust(bottom=0.15)  # Make room for the legend at the bottom
+    plt.subplots_adjust(bottom=0.09)  # leave room for the legend and larger fonts
     plt.show()
