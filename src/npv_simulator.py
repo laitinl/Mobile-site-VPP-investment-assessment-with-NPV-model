@@ -62,6 +62,7 @@ class NPVSimulator:
             self.config["battery_installation_cost"]
         )
         vpp_controller_cost = self.config["vpp_controller_cost"]
+        ffr_yield = self.config["ffr_yield"]
         fcr_yield = self.config["fcr_yield"]
         afrr_yield = self.config["afrr_yield"]
         load_shifting_savings = self.config["load_shifting_savings"]
@@ -78,7 +79,9 @@ class NPVSimulator:
         )  # Assuming battery capacity equals VPP total power for one hour
         investment_cost = (
             battery_capacity * battery_capacity_cost
-            + n_sites * fixed_battery_installation_cost
+            + n_sites
+            * fixed_battery_installation_cost
+            * np.array([[np.abs(np.sign(x)) for x in self.cases["Investment_size"]]])
             + battery_capacity * variable_battery_installation_cost
             + n_sites * vpp_controller_cost * self.cases["Controller"]
         )
@@ -86,9 +89,10 @@ class NPVSimulator:
             battery_capacity * battery_capacity_cost
             + n_sites * vpp_controller_cost * self.cases["Controller"]
         ) * self.config["o&m_cost"]
-        annual_cost = om_cost + connectivity_cost * n_sites
+        annual_cost = om_cost + connectivity_cost * n_sites * self.cases["Connectivity"]
         reserve_market_yield = (
-            self.cases["FCR weight"] * fcr_yield
+            self.cases["FFR weight"] * ffr_yield
+            + self.cases["FCR weight"] * fcr_yield
             + self.cases["aFRR weight"] * afrr_yield
         )
 
@@ -128,6 +132,7 @@ class NPVSimulator:
                 peak_shaving_savings_per_site
                 * n_sites
                 * (1 + power_charge_multiplier[:, np.newaxis] * (year + 1) / n_years)
+                * self.cases["Peak shaving"][np.newaxis, :]
             )
             cash_flows[:, year, :] = (
                 reserve_market_revenue + load_shifting_revenue + peak_shaving_revenue
@@ -149,6 +154,7 @@ class NPVSimulator:
             "variable_battery_installation_cost"
         ].to_numpy()
         vpp_controller_cost = df["vpp_controller_cost"].to_numpy()
+        ffr_yield = df["ffr_yield"].to_numpy()
         fcr_yield = df["fcr_yield"].to_numpy()
         afrr_yield = df["afrr_yield"].to_numpy()
         load_shifting_savings = df["load_shifting_savings"].to_numpy()
@@ -169,7 +175,9 @@ class NPVSimulator:
         )  # Assuming battery capacity equals VPP total power for one hour
         investment_cost = (
             battery_capacity * battery_capacity_cost
-            + n_sites * fixed_battery_installation_cost
+            + n_sites
+            * fixed_battery_installation_cost
+            * np.array([[np.abs(np.sign(x)) for x in self.cases["Investment_size"]]])
             + battery_capacity * variable_battery_installation_cost
             + n_sites * vpp_controller_cost * self.cases["Controller"]
         )
@@ -177,9 +185,10 @@ class NPVSimulator:
             battery_capacity * battery_capacity_cost
             + n_sites * vpp_controller_cost * self.cases["Controller"]
         ) * df["o&m_cost"].to_numpy()
-        annual_cost = om_cost + connectivity_cost * n_sites
+        annual_cost = om_cost + connectivity_cost * n_sites * self.cases["Connectivity"]
         reserve_market_yield = (
-            self.cases["FCR weight"] * fcr_yield
+            self.cases["FFR weight"] * ffr_yield
+            + self.cases["FCR weight"] * fcr_yield
             + self.cases["aFRR weight"] * afrr_yield
         )
 
@@ -205,6 +214,7 @@ class NPVSimulator:
                 peak_shaving_savings_per_site
                 * n_sites
                 * (1 + power_charge_multiplier * (year + 1) / n_years)
+                * self.cases["Peak shaving"][np.newaxis, :]
             )
             cash_flows[:, year, :] = (
                 reserve_market_revenue + load_shifting_revenue + peak_shaving_revenue
@@ -220,6 +230,7 @@ class NPVSimulator:
             "fixed_battery_installation_cost",
             "variable_battery_installation_cost",
             "vpp_controller_cost",
+            "ffr_yield",
             "fcr_yield",
             "afrr_yield",
             "load_shifting_savings",
@@ -238,6 +249,7 @@ class NPVSimulator:
             self.config["battery_installation_cost"][0],
             self.config["battery_installation_cost"][1],
             self.config["vpp_controller_cost"],
+            self.config["ffr_yield"],
             self.config["fcr_yield"],
             self.config["afrr_yield"],
             self.config["load_shifting_savings"],

@@ -13,15 +13,24 @@ from src.utils.plotting import (
 
 def main():
     cases = {
-        "Investment_size": np.array([1, 4, 1, 4, 1, 4]),  # Extra capacity hours
-        "FCR weight": np.array([0, 0, 1, 0, 1, 0]),  # Weight of FCR revenues
-        "aFRR weight": np.array([0, 0, 0, 1, 0, 1]),  # Weight of aFRR revenues
+        "Investment_size": np.array(
+            [0, 1, 4, 0, 1, 4, 0, 1, 4]
+        ),  # Extra capacity hours
+        "FFR weight": np.array([0, 0, 0, 1, 0, 0, 1, 0, 0]),  # Weight of FFR revenues
+        "FCR weight": np.array([0, 0, 0, 0, 1, 0, 0, 1, 0]),  # Weight of FCR revenues
+        "aFRR weight": np.array([0, 0, 0, 0, 0, 1, 0, 0, 1]),  # Weight of aFRR revenues
         "LS weight": np.array(
-            [0.25, 1, 0, 0, 0, 0]
+            [0, 0.25, 1, 0, 0, 0, 0, 0, 0]
         ),  # Weight of load shifting revenues
         "Controller": np.array(
-            [False, False, False, False, True, True]
+            [False, False, False, False, False, False, True, True, True]
         ),  # Whether a VPP controller is used
+        "Connectivity": np.array(
+            [False, True, True, True, True, True, True, True, True]
+        ),  # Whether VPP connectivity is used
+        "Peak shaving": np.array(
+            [False, True, True, False, True, True, True, True, True]
+        ),  # Whether peak shaving is used
     }
 
     config = {
@@ -32,6 +41,7 @@ def main():
             25,
         ),  # Installation cost per site (fixed cost, cost per kWh)
         "vpp_controller_cost": 1500,  # Cost for VPP controller per
+        "ffr_yield": 23561,  # Yield from FFR up and down market €/MW/year
         "fcr_yield": 109000 + 118000,  # Yield from FCR-D up and down market €/MW/year
         "afrr_yield": 176000 + 141000,  # Yield from aFRR up and down market €/MW/year
         "load_shifting_savings": (40 * 4) * 365,  # Savings from load shifting €/MW/year
@@ -44,7 +54,7 @@ def main():
             0.2,
             0.3,
         ),  # BSP fee distribution parameters (min, mode, max)
-        "site_mean_power": 2,  # Mean power per site in kW
+        "site_mean_power": 2.5,  # Mean power per site in kW
         "vpp_total_power": 1000,  # Total power of the VPP in kW
         "discount_rate": 0.057,  # Discount rate for NPV calculation
         "reserve_price_multiplier_dist": (
@@ -95,8 +105,8 @@ def main():
 
     simulator = NPVSimulator(cases, config)
     sens_params, sens_array = simulator.run_sensitivity_analysis()
-    scenarios = ["1a", "1b", "2a", "2b", "3a", "3b"]
-    for i in range(6):
+    scenarios = ["1a", "1b", "1c", "2a", "2b", "2c", "3a", "3b", "3c"]
+    for i in range(len(scenarios)):
         make_tornado_plot(sens_params, sens_array, i, title=f"Scenario {scenarios[i]}")
 
     results_with_different_site_power = []
@@ -130,20 +140,25 @@ def main():
     results = simulator.run_uncertainty_analysis(count=3000000)
     results_with_different_site_power.append(results)
 
+    config["site_mean_power"] = 20
+    simulator = NPVSimulator(cases, config)
+    results = simulator.run_uncertainty_analysis(count=3000000)
+    results_with_different_site_power.append(results)
+
     plot_npv_boxplots(
-        site_powers=[2, 5, 10],
+        site_powers=[2.5, 5, 10, 20],
         results_with_different_site_power=results_with_different_site_power,
         scenarios=scenarios,
     )
 
     plot_npv_hist_grid(
-        site_powers=[2, 5, 10],
+        site_powers=[2.5, 5, 10, 20],
         results_with_different_site_power=results_with_different_site_power,
         scenarios=scenarios,
     )
 
     plot_npv_hist_overlaid(
-        site_powers=[2, 5, 10],
+        site_powers=[2.5, 5, 10, 20],
         results_with_different_site_power=results_with_different_site_power,
         scenarios=scenarios,
     )
