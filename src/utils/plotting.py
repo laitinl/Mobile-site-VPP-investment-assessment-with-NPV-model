@@ -296,10 +296,16 @@ def plot_tornado_grid(sens_params, sens_array, scenarios, n_params=6, agg="max")
 
     Each row shares a y-axis (parameter list), so a subplot's ranking can't
     vary case to case within a row. To keep that shared axis readable, only
-    the `n_params` parameters most sensitive within the row are shown; the
-    per-parameter sensitivity used to pick and order them is aggregated
-    across the row's cases with `agg` ("max", "mean", or "sum" of the
-    cases' |sens_plus - sens_minus|).
+    the `n_params` parameters most sensitive within the row are shown.
+
+    Cases can have very different NPV magnitudes (e.g. a larger investment
+    size), which would let a single high-magnitude case dominate a raw
+    |sens_plus - sens_minus| comparison. To stay scale-independent, each
+    case first ranks its own parameters by sensitivity (1 = most sensitive
+    in that case), and those per-case ranks are aggregated across the row's
+    cases with `agg` ("max" takes the best rank a parameter reaches in any
+    case, "mean"/"sum" reward parameters that rank highly across all
+    cases).
     """
     agg_funcs = {"max": np.max, "mean": np.mean, "sum": np.sum}
     agg_func = agg_funcs[agg]
@@ -319,7 +325,17 @@ def plot_tornado_grid(sens_params, sens_array, scenarios, n_params=6, agg="max")
     n_cols = len(letters)
 
     sens_params = np.asarray(sens_params)
+    n_params_total = len(sens_params)
     delta = np.abs(sens_array[:, 0, :] - sens_array[:, 1, :])  # (n_params, n_scenarios)
+
+    # Rank parameters within each scenario column (1 = most sensitive), then
+    # flip to a score where larger is more sensitive so it can be aggregated
+    # with the same max/mean/sum logic used for the row selection below.
+    order = np.argsort(-delta, axis=0)
+    ranks = np.empty_like(order)
+    for j in range(order.shape[1]):
+        ranks[order[:, j], j] = np.arange(1, n_params_total + 1)
+    sensitivity_score = n_params_total - ranks
 
     fig, axs = plt.subplots(
         n_rows,
@@ -339,7 +355,7 @@ def plot_tornado_grid(sens_params, sens_array, scenarios, n_params=6, agg="max")
             for let in letters
             if f"{num}{let}" in scenarios
         ]
-        row_sensitivity = agg_func(delta[:, row_indices], axis=1)
+        row_sensitivity = agg_func(sensitivity_score[:, row_indices], axis=1)
         # Most sensitive n_params, ordered ascending so the largest bar sits
         # at the top of the barh (matches the original tornado convention)
         top_params = np.argsort(row_sensitivity)[::-1][:n_params]
