@@ -1,3 +1,5 @@
+import re
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -134,8 +136,6 @@ def plot_npv_hist_overlaid(site_powers, results_with_different_site_power, scena
     For each grid cell we look up the matching scenario and plot overlaid
     histograms for all provided `results_with_different_site_power`.
     """
-    import re
-
     # Extract numeric row keys and letter column keys from scenario strings
     parsed = [re.match(r"(\d+)(\D+)", s) for s in scenarios]
     numbers = []
@@ -251,4 +251,166 @@ def plot_npv_hist_overlaid(site_powers, results_with_different_site_power, scena
 
     plt.tight_layout()
     plt.subplots_adjust(bottom=0.09)  # leave room for the legend and larger fonts
+    plt.show()
+
+
+def plot_tornado(sens_params, sens_array, scenario, title=None):
+    """Plot a single tornado chart for one scenario.
+
+    `sens_array` has shape (n_params, 2, n_scenarios) with index 0 the
+    +20% sensitivity and index 1 the -20% sensitivity, as produced by
+    NPVSimulator.run_sensitivity_analysis. All parameters are shown,
+    sorted by the magnitude of their NPV swing.
+    """
+    sens_plus = sens_array[:, 0, scenario]
+    sens_minus = sens_array[:, 1, scenario]
+    delta = np.abs(sens_plus - sens_minus)
+    order = np.argsort(delta)
+    param_labels = np.asarray(sens_params)[order]
+    y_pos = np.arange(len(order))
+
+    ax = plt.gca()
+    ax.grid(axis="y", alpha=0.5)
+    ax.barh(y_pos, sens_plus[order], label="Parameter increase 20%")
+    ax.barh(y_pos, sens_minus[order], label="Parameter decrease 20%")
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(param_labels, fontsize=FONT_SIZES["ticks"])
+    ax.legend(fontsize=FONT_SIZES["legend"])
+    ax.set_title(title, fontsize=FONT_SIZES["title"])
+    ax.set_xlabel("NPV change (€)", fontsize=FONT_SIZES["label"])
+    ax.tick_params(axis="x", labelsize=FONT_SIZES["ticks"])
+    plt.show()
+
+
+def plot_tornado_grid(sens_params, sens_array, scenarios, n_params=6, agg="max"):
+    """Plot tornado charts for all scenarios in a single grid of subplots.
+
+    Grid layout:
+      - rows correspond to numeric scenario groups (e.g. 1,2,3)
+      - columns correspond to letter cases (e.g. a,b,c)
+
+    `scenarios` is expected to contain labels like ['1a','1b','1c','2a',...],
+    matching the scenario axis of `sens_array` (shape: n_params x 2 x
+    n_scenarios, with index 0 the +20% sensitivity and index 1 the -20%
+    sensitivity, as produced by NPVSimulator.run_sensitivity_analysis).
+
+    Each row shares a y-axis (parameter list), so a subplot's ranking can't
+    vary case to case within a row. To keep that shared axis readable, only
+    the `n_params` parameters most sensitive within the row are shown; the
+    per-parameter sensitivity used to pick and order them is aggregated
+    across the row's cases with `agg` ("max", "mean", or "sum" of the
+    cases' |sens_plus - sens_minus|).
+    """
+    agg_funcs = {"max": np.max, "mean": np.mean, "sum": np.sum}
+    agg_func = agg_funcs[agg]
+
+    # Extract numeric row keys and letter column keys from scenario strings
+    parsed = [re.match(r"(\d+)(\D+)", s) for s in scenarios]
+    numbers = []
+    letters = []
+    for m in parsed:
+        if m:
+            numbers.append(m.group(1))
+            letters.append(m.group(2))
+    numbers = list(dict.fromkeys(numbers))
+    letters = list(dict.fromkeys(letters))
+
+    n_rows = len(numbers)
+    n_cols = len(letters)
+
+    sens_params = np.asarray(sens_params)
+    delta = np.abs(sens_array[:, 0, :] - sens_array[:, 1, :])  # (n_params, n_scenarios)
+
+    fig, axs = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(4.5 * n_cols, max(2.5, 0.4 * n_params) * n_rows),
+        squeeze=False,
+        sharey="row",
+    )
+
+    legend_handles = []
+    legend_labels = []
+
+    for r, num in enumerate(numbers):
+        # Scenario indices present for this row, used to rank parameters
+        row_indices = [
+            scenarios.index(f"{num}{let}")
+            for let in letters
+            if f"{num}{let}" in scenarios
+        ]
+        row_sensitivity = agg_func(delta[:, row_indices], axis=1)
+        # Most sensitive n_params, ordered ascending so the largest bar sits
+        # at the top of the barh (matches the original tornado convention)
+        top_params = np.argsort(row_sensitivity)[::-1][:n_params]
+        order_idx = top_params[np.argsort(row_sensitivity[top_params])]
+        y_pos = np.arange(len(order_idx))
+        param_labels = sens_params[order_idx]
+
+        for c, let in enumerate(letters):
+            ax = axs[r, c]
+            scenario_label = f"{num}{let}"
+
+            if scenario_label not in scenarios:
+                ax.axis("off")
+                continue
+
+            idx = scenarios.index(scenario_label)
+            ax.grid(axis="y", alpha=0.5)
+            h_plus = ax.barh(
+                y_pos, sens_array[order_idx, 0, idx], label="Parameter increase 20%"
+            )
+            h_minus = ax.barh(
+                y_pos, sens_array[order_idx, 1, idx], label="Parameter decrease 20%"
+            )
+
+            if r == 0 and c == 0:
+                legend_handles.extend([h_plus, h_minus])
+                legend_labels.extend(["Parameter increase 20%", "Parameter decrease 20%"])
+
+            # Column titles: letters (cases) on top row
+            if r == 0:
+                ax.set_title(
+                    f"Case {let}",
+                    fontweight="bold",
+                    pad=10,
+                    fontsize=FONT_SIZES["title"],
+                )
+
+            # y ticks/labels only on leftmost column (rest share the axis)
+            if c == 0:
+                ax.set_yticks(y_pos)
+                ax.set_yticklabels(param_labels, fontsize=FONT_SIZES["ticks"])
+                ax.text(
+                    -0.6,
+                    0.5,
+                    f"Scenario {num}",
+                    transform=ax.transAxes,
+                    rotation=90,
+                    verticalalignment="center",
+                    fontweight="bold",
+                    fontsize=FONT_SIZES["row_label"],
+                )
+            else:
+                ax.tick_params(axis="y", labelleft=False)
+
+            # xlabel only on bottom row
+            if r == n_rows - 1:
+                ax.set_xlabel("NPV change (€)", fontsize=FONT_SIZES["label"])
+
+            ax.tick_params(axis="x", labelsize=FONT_SIZES["ticks"])
+
+    if legend_handles:
+        fig.legend(
+            legend_handles,
+            legend_labels,
+            loc="lower center",
+            bbox_to_anchor=(0.5, -0.04),
+            ncol=2,
+            fontsize=FONT_SIZES["legend"],
+            frameon=True,
+        )
+
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.08, left=0.12)
     plt.show()
