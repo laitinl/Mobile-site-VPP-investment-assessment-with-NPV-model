@@ -5,90 +5,144 @@ from src.npv_simulator import NPVSimulator
 
 class TestNPVSimulator(unittest.TestCase):
     def setUp(self):
+        eps = 1e-12  # Small epsilon
         self.cases = {
-            "Investment_size": np.array([1, 4, 1, 4, 1, 4]),  # Extra capacity hours
-            "FCR weight": np.array([0, 0, 1, 0.5, 1, 0.5]),  # Weight of FCR revenues
-            "aFRR weight": np.array([0, 0, 0, 0.7, 0, 0.7]),  # Weight of aFRR revenues
-            "LS weight": np.array(
-                [1, 1, 0, 0, 0, 0]
-            ),  # Weight of load shifting revenues
+            "Investment_size": np.array(
+                [0, 1, 3, 0, 1, 3, 0, 1, 3]
+            ),  # Extra capacity hours
+            "FFR yield": np.array(
+                [0, 0, 0, 16960, 16960, 16960, 16960, 16960, 16960]
+            ),  # Yield from FFR up market €/MW/year
+            "FCR-D yield": np.array(
+                [0, 0, 0, 0, 67960, 0.44 * 94710, 0, 67960, 0.44 * 94710]
+            ),  # Yield from FCR-D up and downmarket €/MW/year
+            "aFRR yield": np.array(
+                [0, 0, 0, 0, 0, 0.56 * 94710, 0, 0, 0.56 * 94710]
+            ),  # Yield from aFRR up and downmarket €/MW/year
+            "LS savings": np.array(
+                [0, 21330, 60070, 0, 21330, 60070, 0, 21330, 60070]
+            ),  # Savings from load shifting €/MW/year
             "Controller": np.array(
-                [False, False, False, False, True, True]
+                [False, False, False, False, False, False, True, True, True]
             ),  # Whether a VPP controller is used
+            "Connectivity": np.array(
+                [False, True, True, True, True, True, True, True, True]
+            ),  # Whether VPP connectivity is used
+            "Peak shaving": np.array(
+                [False, True, True, False, True, True, False, True, True]
+            ),  # Whether peak shaving is used
         }
+
         self.config = {
             "n_years": 10,
-            "battery_capacity_cost": 200,  # Cost per kWh
-            "battery_installation_cost": 1000,  # Installation cost per site
-            "vpp_controller_cost": 1000,  # Cost for VPP controller per
-            "fcr_yield": 108000,  # Yield from FCR-D up market €/MW/year
-            "afrr_yield": 204000,  # Yield from aFRR market €/MW/year
-            "load_shifting_savings": (30 * 2 + 15 * 2)
-            * 365,  # Savings from load shifting €/MW/year
-            "bsp_fee_min": 0.10,  # BSP share of revenue
-            "bsp_fee_max": 0.25,
-            "site_mean_power": 4.5,  # Mean power per site in kW
+            "battery_capacity_cost": (115 - eps, 115, 115 + eps),  # Cost per kWh
+            "battery_installation_cost": (
+                500,
+                25,
+            ),  # Installation cost per site (fixed cost, variable cost per kWh)
+            "vpp_controller_cost": (
+                500 - eps,
+                500,
+                500 + eps,
+            ),  # Cost for VPP controller per
+            "ffr_weight": 1,  # Weight of FFR revenues
+            "fcr_weight": 1,  # Weight of FCR revenues
+            "afrr_weight": 1,  # Weight of aFRR revenues
+            "ls_weight": 1,  # Weight of load shifting revenues
+            "peak_shaving_savings_per_site": 0,  # Single site savings from peak shaving €/MW/year
+            "connectivity_cost": (
+                12 - eps,
+                12,
+                12 + eps,
+            ),  # VPP connectivity cost per year
+            "o&m_cost": (
+                0.02 - eps,
+                0.02,
+                0.02 + eps,
+            ),  # O&M cost as a fraction of investment cost
+            "bsp_fee_dist": (
+                0.20 - eps,
+                0.20,
+                0.20 + eps,
+            ),  # BSP fee distribution parameters (min, mode, max)
+            "site_mean_power": 2.5,  # Mean power per site in kW
             "vpp_total_power": 1000,  # Total power of the VPP in kW
-            "discount_rate": 0.08,  # Discount rate for NPV calculation
-            "reserve_price_multiplier_min": -0.5,  # Min multiplier for reserve market
-            "reserve_price_multiplier_max": 0.2,  # Max multiplier for reserve market
-            "spot_price_multiplier_min": -0.2,  # Min multiplier for spot price
-            "spot_price_multiplier_max": 0.2,  # Max multiplier for spot price
-            "tax_rate": 0.2,  # Tax rate for NPV calculation
+            "discount_rate": (
+                0.057 - eps,
+                0.057,
+                0.057 + eps,
+            ),  # Discount rate for NPV calculation
+            "reserve_price_multiplier_dist": (
+                -0.2 - eps,
+                -0.2,
+                -0.2 + eps,
+            ),  # Reserve price multiplier distribution (min, mode, max)
+            "spot_volatility_multiplier_dist": (
+                0.0 - eps,
+                0.0,
+                0.0 + eps,
+            ),  # Spot price multiplier distribution (min, mode, max)
         }
 
     def test_run(self):
         simulator = NPVSimulator(self.cases, self.config)
-        results = simulator.run_uncertainty_analysis(count=100)
+        results, _, _ = simulator.run_uncertainty_analysis(count=100)
         self.assertEqual(results.shape[2], len(self.cases["Investment_size"]))
 
     def test_npv_scenario_5(self):
+        scenario_index = 4  # Index for the scenario with 1h battery, FFR, FCR-D, aFRR, load shifting, controller, connectivity, and peak shaving
         simulator = NPVSimulator(self.cases, self.config)
-        results = simulator.run_uncertainty_analysis(count=1000, random_seed=42)
+        results, _, _ = simulator.run_uncertainty_analysis(count=100, random_seed=42)
 
         np.random.seed(42)
 
         # Fixed parameters
         n_years = self.config["n_years"]
-        battery_capacity_cost = self.config["battery_capacity_cost"]
-        battery_installation_cost = self.config["battery_installation_cost"]
-        vpp_controller_cost = self.config["vpp_controller_cost"]
-        reserve_market_yield = self.config["fcr_yield"]
-        load_shifting_savings = 0 * self.config["load_shifting_savings"]
+        battery_capacity_cost = self.config["battery_capacity_cost"][1]
+        fixed_battery_installation_cost, variable_battery_installation_cost = (
+            self.config["battery_installation_cost"]
+        )
+        vpp_controller_cost = self.config["vpp_controller_cost"][1]
         site_mean_power = self.config["site_mean_power"]
         vpp_total_power = self.config["vpp_total_power"]
-        discount_rate = self.config["discount_rate"]
-        tax_rate = self.config["tax_rate"]
+        discount_rate = self.config["discount_rate"][1]
+        connectivity_cost = self.config["connectivity_cost"][1]
+        om_cost = self.config["o&m_cost"][1]
 
         # Derived parameters
-        n_sites = vpp_total_power // site_mean_power
-        battery_capacity = vpp_total_power  # Assuming battery capacity equals VPP total power for one hour
+        n_sites = np.ceil(vpp_total_power / site_mean_power).astype(int)
+        battery_capacity = (
+            self.cases["Investment_size"][scenario_index] * vpp_total_power
+        )  # Assuming battery capacity equals VPP total power for one hour
         investment_cost = (
             battery_capacity * battery_capacity_cost
-            + n_sites * battery_installation_cost
-            + n_sites * vpp_controller_cost
+            + n_sites
+            * fixed_battery_installation_cost
+            * np.abs(np.sign(self.cases["Investment_size"][scenario_index]))
+            + battery_capacity * variable_battery_installation_cost
+            + n_sites * vpp_controller_cost * self.cases["Controller"][scenario_index]
         )
-        deprecation = investment_cost / n_years
+        om_expense = (
+            battery_capacity * battery_capacity_cost
+            + n_sites * vpp_controller_cost * self.cases["Controller"][scenario_index]
+        ) * om_cost
+        annual_cost = (
+            om_expense
+            + connectivity_cost * n_sites * self.cases["Connectivity"][scenario_index]
+        )
+        reserve_market_yield = (
+            self.cases["FFR yield"][scenario_index]
+            + self.cases["FCR-D yield"][scenario_index]
+            + self.cases["aFRR yield"][scenario_index]
+        )
 
         # Sampled parameters
-        reserve_price_multiplier = np.random.uniform(
-            self.config["reserve_price_multiplier_min"],
-            self.config["reserve_price_multiplier_max"],
-            1000,
-        )
-        spot_price_multiplier = np.random.uniform(
-            self.config["spot_price_multiplier_min"],
-            self.config["spot_price_multiplier_max"],
-            1000,
-        )
-        bsp_fee = np.random.uniform(
-            self.config["bsp_fee_min"],
-            self.config["bsp_fee_max"],
-            1000,
-        )
+        reserve_price_multiplier = self.config["reserve_price_multiplier_dist"][1]
+        spot_price_multiplier = self.config["spot_volatility_multiplier_dist"][1]
+        bsp_fee = self.config["bsp_fee_dist"][1]
 
         # Calculate cash flows
-        cash_flows = np.zeros((1000, n_years + 1))
+        cash_flows = np.zeros((100, n_years + 1))
         cash_flows[:, 0] = -investment_cost
 
         for year in range(1, n_years + 1):
@@ -99,23 +153,23 @@ class TestNPVSimulator(unittest.TestCase):
                 / 1000
             )
             load_shifting_revenue = (
-                load_shifting_savings
+                self.cases["LS savings"][scenario_index]
                 * (1 + spot_price_multiplier * (year + 1) / n_years)
                 * vpp_total_power
                 / 1000
             )
 
-            total_revenue = reserve_market_revenue + load_shifting_revenue
-            ebit = total_revenue * (1 - bsp_fee) - deprecation
-
-            net_income = ebit
-            net_income[net_income > 0] -= tax_rate * net_income[net_income > 0]
-            cash_flows[:, year] = net_income + deprecation
+            total_revenue = (
+                reserve_market_revenue * (1 - bsp_fee) + load_shifting_revenue
+            )
+            cash_flows[:, year] = total_revenue - annual_cost
 
         years = np.arange(0, n_years + 1)
         npv = np.cumsum(cash_flows / ((1 + discount_rate) ** years), axis=1)
 
-        self.assertAlmostEqual(np.linalg.norm(npv - results[:, :, 4]), 0, delta=0.01)
+        self.assertAlmostEqual(
+            np.linalg.norm(npv - results[:, :, scenario_index]), 0, delta=0.01
+        )
 
 
 if __name__ == "__main__":

@@ -62,11 +62,6 @@ class NPVSimulator:
         fixed_battery_installation_cost, variable_battery_installation_cost = (
             self.config["battery_installation_cost"]
         )
-        ffr_yield = self.config["ffr_yield"]
-        fcr_yield = self.config["fcr_yield"]
-        afrr_yield = self.config["afrr_yield"]
-        load_shifting_savings = self.config["load_shifting_savings"]
-        peak_shaving_savings_per_site = self.config["peak_shaving_savings_per_site"]
         site_mean_power = self.config["site_mean_power"]
         vpp_total_power = self.config["vpp_total_power"]
 
@@ -83,9 +78,6 @@ class NPVSimulator:
         ).rvs(size=count)
         spot_volatility_multiplier = pert(
             *self.config["spot_volatility_multiplier_dist"]
-        ).rvs(size=count)
-        power_charge_multiplier = pert(
-            *self.config["power_charge_multiplier_dist"]
         ).rvs(size=count)
         bsp_fee = pert(*self.config["bsp_fee_dist"]).rvs(size=count)
 
@@ -115,9 +107,9 @@ class NPVSimulator:
             * self.cases["Connectivity"][np.newaxis, :]
         )
         reserve_market_yield = (
-            self.cases["FFR weight"] * ffr_yield
-            + self.cases["FCR weight"] * fcr_yield
-            + self.cases["aFRR weight"] * afrr_yield
+            self.cases["FFR yield"]
+            + self.cases["FCR-D yield"]
+            + self.cases["aFRR yield"]
         )
 
         # Calculate cash flows
@@ -135,27 +127,17 @@ class NPVSimulator:
                 / 1000
             )
             load_shifting_revenue = (
-                self.cases["LS weight"][np.newaxis, :]
-                * load_shifting_savings
+                self.cases["LS savings"][np.newaxis, :]
                 * (1 + spot_volatility_multiplier[:, np.newaxis] * (year + 1) / n_years)
                 * vpp_total_power
                 / 1000
             )
-            peak_shaving_revenue = (
-                peak_shaving_savings_per_site
-                * n_sites
-                * (1 + power_charge_multiplier[:, np.newaxis] * (year + 1) / n_years)
-                * self.cases["Peak shaving"][np.newaxis, :]
-            )
             cash_flows[:, year, :] = (
                 (reserve_market_revenue) * (1 - bsp_fee[:, np.newaxis])
                 + load_shifting_revenue
-                + peak_shaving_revenue
                 - annual_cost[np.newaxis, :]
             )
-            revs[:, year, :] = (
-                reserve_market_revenue + load_shifting_revenue + peak_shaving_revenue
-            )
+            revs[:, year, :] = reserve_market_revenue + load_shifting_revenue
 
         # Calculate NPV
         out = self._calculate_npv(cash_flows, discount_rate)
@@ -173,11 +155,10 @@ class NPVSimulator:
             "variable_battery_installation_cost"
         ].to_numpy()
         vpp_controller_cost = df["vpp_controller_cost"].to_numpy()
-        ffr_yield = df["ffr_yield"].to_numpy()
-        fcr_yield = df["fcr_yield"].to_numpy()
-        afrr_yield = df["afrr_yield"].to_numpy()
-        load_shifting_savings = df["load_shifting_savings"].to_numpy()
-        peak_shaving_savings_per_site = df["peak_shaving_savings_per_site"].to_numpy()
+        ffr_weight = df["ffr_weight"].to_numpy()
+        fcr_weight = df["fcr_weight"].to_numpy()
+        afrr_weight = df["afrr_weight"].to_numpy()
+        ls_weight = df["ls_weight"].to_numpy()
         site_mean_power = df["site_mean_power"].to_numpy()
         vpp_total_power = self.config["vpp_total_power"]
         discount_rate = df["discount_rate"].to_numpy()
@@ -206,9 +187,9 @@ class NPVSimulator:
         ) * df["o&m_cost"].to_numpy()
         annual_cost = om_cost + connectivity_cost * n_sites * self.cases["Connectivity"]
         reserve_market_yield = (
-            self.cases["FFR weight"] * ffr_yield
-            + self.cases["FCR weight"] * fcr_yield
-            + self.cases["aFRR weight"] * afrr_yield
+            self.cases["FFR yield"] * ffr_weight
+            + self.cases["FCR-D yield"] * fcr_weight
+            + self.cases["aFRR yield"] * afrr_weight
         )
 
         # Calculate cash flows
@@ -223,22 +204,15 @@ class NPVSimulator:
                 / 1000
             )
             load_shifting_revenue = (
-                self.cases["LS weight"][np.newaxis, :]
-                * load_shifting_savings
+                self.cases["LS savings"][np.newaxis, :]
+                * ls_weight
                 * (1 + spot_volatility_multiplier * (year + 1) / n_years)
                 * vpp_total_power
                 / 1000
             )
-            peak_shaving_revenue = (
-                peak_shaving_savings_per_site
-                * n_sites
-                * (1 + power_charge_multiplier * (year + 1) / n_years)
-                * self.cases["Peak shaving"][np.newaxis, :]
-            )
             cash_flows[:, year, :] = (
                 reserve_market_revenue * (1 - bsp_fee)
                 + load_shifting_revenue
-                + peak_shaving_revenue
                 - annual_cost[np.newaxis, :]
             )
 
@@ -252,10 +226,10 @@ class NPVSimulator:
             "fixed_battery_installation_cost",
             "variable_battery_installation_cost",
             "vpp_controller_cost",
-            "ffr_yield",
-            "fcr_yield",
-            "afrr_yield",
-            "load_shifting_savings",
+            "ffr_weight",
+            "fcr_weight",
+            "afrr_weight",
+            "ls_weight",
             "peak_shaving_savings_per_site",
             "connectivity_cost",
             "o&m_cost",
@@ -271,10 +245,10 @@ class NPVSimulator:
             self.config["battery_installation_cost"][0],
             self.config["battery_installation_cost"][1],
             self.config["vpp_controller_cost"][1],
-            self.config["ffr_yield"],
-            self.config["fcr_yield"],
-            self.config["afrr_yield"],
-            self.config["load_shifting_savings"],
+            self.config["ffr_weight"],
+            self.config["fcr_weight"],
+            self.config["afrr_weight"],
+            self.config["ls_weight"],
             self.config["peak_shaving_savings_per_site"],
             self.config["connectivity_cost"][1],
             self.config["o&m_cost"][1],
