@@ -11,69 +11,73 @@ from src.utils.plotting import (
     plot_tornado_grid,
 )
 
+cases = {
+    "Investment_size": np.array([0, 1, 3, 0, 1, 3, 0, 1, 3]),  # Extra capacity hours
+    "FFR yield": np.array(
+        [0, 0, 0, 16960, 16960, 16960, 16960, 16960, 16960]
+    ),  # Yield from FFR up market €/MW/year
+    "FCR-D yield": np.array(
+        [0, 0, 0, 0, 67960, 0.44 * 94710, 0, 67960, 0.44 * 94710]
+    ),  # Yield from FCR-D up and downmarket €/MW/year
+    "aFRR yield": np.array(
+        [0, 0, 0, 0, 0, 0.56 * 94710, 0, 0, 0.56 * 94710]
+    ),  # Yield from aFRR up and downmarket €/MW/year
+    "LS savings": np.array(
+        [0, 21330, 60070, 0, 21330, 60070, 0, 21330, 60070]
+    ),  # Savings from load shifting €/MW/year
+    "Controller": np.array(
+        [False, False, False, False, False, False, True, True, True]
+    ),  # Whether a VPP controller is used
+    "Connectivity": np.array(
+        [False, True, True, True, True, True, True, True, True]
+    ),  # Whether VPP connectivity is used
+    "Peak shaving": np.array(
+        [False, True, True, False, True, True, False, True, True]
+    ),  # Whether peak shaving is used
+}
+
+config = {
+    "n_years": 10,
+    "battery_capacity_cost": (50, 115, 200),  # Cost per kWh
+    "battery_installation_cost": (
+        500,
+        25,
+    ),  # Installation cost per site (fixed cost, variable cost per kWh)
+    "vpp_controller_cost": (250, 500, 750),  # Cost for VPP controller per
+    "ffr_weight": 1,  # Weight of FFR revenues
+    "fcr_weight": 1,  # Weight of FCR revenues
+    "afrr_weight": 1,  # Weight of aFRR revenues
+    "ls_weight": 1,  # Weight of load shifting revenues
+    "peak_shaving_savings_per_site": 0,  # Single site savings from peak shaving €/MW/year
+    "connectivity_cost": (0, 12, 120),  # VPP connectivity cost per year
+    "o&m_cost": (0.01, 0.02, 0.03),  # O&M cost as a fraction of investment cost
+    "bsp_fee_dist": (
+        0.15,
+        0.20,
+        0.25,
+    ),  # BSP fee distribution parameters (min, mode, max)
+    "site_mean_power": 2.5,  # Mean power per site in kW
+    "vpp_total_power": 1000,  # Total power of the VPP in kW
+    "discount_rate": (0.04, 0.057, 0.08),  # Discount rate for NPV calculation
+    "reserve_price_multiplier_dist": (
+        -0.5,
+        -0.2,
+        0.5,
+    ),  # Reserve price multiplier distribution (min, mode, max)
+    "spot_volatility_multiplier_dist": (
+        -0.1,
+        0.0,
+        0.1,
+    ),  # Spot price multiplier distribution (min, mode, max)
+    "power_charge_multiplier_dist": (
+        -0.1,
+        0.2,
+        0.96,
+    ),  # Power charge multiplier distribution (min, mode, max)
+}
+
 
 def main():
-    cases = {
-        "Investment_size": np.array(
-            [0, 1, 3, 0, 1, 3, 0, 1, 3]
-        ),  # Extra capacity hours
-        "FFR weight": np.array([0, 0, 0, 1, 0, 0, 1, 0, 0]),  # Weight of FFR revenues
-        "FCR weight": np.array([0, 0, 0, 0, 1, 0, 0, 1, 0]),  # Weight of FCR revenues
-        "aFRR weight": np.array([0, 0, 0, 0, 0, 1, 0, 0, 1]),  # Weight of aFRR revenues
-        "LS weight": np.array(
-            [0, 0.33, 1, 0, 0.33, 1, 0, 0.33, 1]
-        ),  # Weight of load shifting revenues
-        "Controller": np.array(
-            [False, False, False, False, False, False, True, True, True]
-        ),  # Whether a VPP controller is used
-        "Connectivity": np.array(
-            [False, True, True, True, True, True, True, True, True]
-        ),  # Whether VPP connectivity is used
-        "Peak shaving": np.array(
-            [False, True, True, False, True, True, False, True, True]
-        ),  # Whether peak shaving is used
-    }
-
-    config = {
-        "n_years": 10,
-        "battery_capacity_cost": (50, 115, 200),  # Cost per kWh
-        "battery_installation_cost": (
-            500,
-            25,
-        ),  # Installation cost per site (fixed cost, variable cost per kWh)
-        "vpp_controller_cost": (500, 1000, 1500),  # Cost for VPP controller per
-        "ffr_yield": 16960,  # Yield from FFR up and down market €/MW/year
-        "fcr_yield": 67960,  # Yield from FCR-D up and down market €/MW/year
-        "afrr_yield": 94710,  # Yield from aFRR up and down market €/MW/year
-        "load_shifting_savings": 60070,  # Savings from load shifting €/MW/year
-        "peak_shaving_savings_per_site": 0,  # Single site savings from peak shaving €/MW/year
-        "connectivity_cost": (0, 12, 120),  # VPP connectivity cost per year
-        "o&m_cost": (0.01, 0.02, 0.03),  # O&M cost as a fraction of investment cost
-        "bsp_fee_dist": (
-            0.1,
-            0.2,
-            0.3,
-        ),  # BSP fee distribution parameters (min, mode, max)
-        "site_mean_power": 2.5,  # Mean power per site in kW
-        "vpp_total_power": 1000,  # Total power of the VPP in kW
-        "discount_rate": (0.04, 0.057, 0.08),  # Discount rate for NPV calculation
-        "reserve_price_multiplier_dist": (
-            -0.5,
-            -0.2,
-            0.5,
-        ),  # Reserve price multiplier distribution (min, mode, max)
-        "spot_volatility_multiplier_dist": (
-            -0.1,
-            0.0,
-            0.1,
-        ),  # Spot price multiplier distribution (min, mode, max)
-        "power_charge_multiplier_dist": (
-            -0.1,
-            0.2,
-            0.96,
-        ),  # Power charge multiplier distribution (min, mode, max)
-    }
-
     simulator = NPVSimulator(cases, config)
     sens_params, sens_array = simulator.run_sensitivity_analysis()
     scenarios = ["1a", "1b", "1c", "2a", "2b", "2c", "3a", "3b", "3c"]
@@ -143,67 +147,6 @@ def main():
 
 
 def analysis():
-    cases = {
-        "Investment_size": np.array(
-            [0, 1, 3, 0, 1, 3, 0, 1, 3]
-        ),  # Extra capacity hours
-        "FFR weight": np.array([0, 0, 0, 1, 0, 0, 1, 0, 0]),  # Weight of FFR revenues
-        "FCR weight": np.array([0, 0, 0, 0, 1, 0, 0, 1, 0]),  # Weight of FCR revenues
-        "aFRR weight": np.array([0, 0, 0, 0, 0, 1, 0, 0, 1]),  # Weight of aFRR revenues
-        "LS weight": np.array(
-            [0, 0.33, 1, 0, 0.33, 1, 0, 0.33, 1]
-        ),  # Weight of load shifting revenues
-        "Controller": np.array(
-            [False, False, False, False, False, False, True, True, True]
-        ),  # Whether a VPP controller is used
-        "Connectivity": np.array(
-            [False, True, True, True, True, True, True, True, True]
-        ),  # Whether VPP connectivity is used
-        "Peak shaving": np.array(
-            [False, True, True, False, True, True, False, True, True]
-        ),  # Whether peak shaving is used
-    }
-
-    config = {
-        "n_years": 10,
-        "battery_capacity_cost": (50, 115, 200),  # Cost per kWh
-        "battery_installation_cost": (
-            500,
-            25,
-        ),  # Installation cost per site (fixed cost, variable cost per kWh)
-        "vpp_controller_cost": (500, 1500, 2500),  # Cost for VPP controller per
-        "ffr_yield": 11840,  # Yield from FFR up and down market €/MW/year
-        "fcr_yield": 119890,  # Yield from FCR-D up and down market €/MW/year
-        "afrr_yield": 131354,  # Yield from aFRR up and down market €/MW/year
-        "load_shifting_savings": 67882,  # Savings from load shifting €/MW/year
-        "peak_shaving_savings_per_site": 0,  # (1.35 *  2) * 12,  # Single site savings from peak shaving €/MW/year
-        "connectivity_cost": (0, 12, 120),  # VPP connectivity cost per year
-        "o&m_cost": (0.01, 0.02, 0.03),  # O&M cost as a fraction of investment cost
-        "bsp_fee_dist": (
-            0.1,
-            0.2,
-            0.3,
-        ),  # BSP fee distribution parameters (min, mode, max)
-        "site_mean_power": 2.5,  # Mean power per site in kW
-        "vpp_total_power": 1000,  # Total power of the VPP in kW
-        "discount_rate": (0.04, 0.057, 0.08),  # Discount rate for NPV calculation
-        "reserve_price_multiplier_dist": (
-            -0.5,
-            -0.2,
-            0.5,
-        ),  # Reserve price multiplier distribution (min, mode, max)
-        "spot_volatility_multiplier_dist": (
-            -0.0001,
-            0.0,
-            0.0001,
-        ),  # (-0.1, 0, 0.1),  # Spot price multiplier distribution (min, mode, max)
-        "power_charge_multiplier_dist": (
-            -0.0001,
-            0,
-            0.0001,
-        ),  # (-0.1, 0.2, 0.96),  # Power charge multiplier distribution (min, mode, max)
-    }
-
     simulator = NPVSimulator(cases, config)
     sens_params, sens_array = simulator.run_sensitivity_analysis()
     scenarios = ["1a", "1b", "1c", "2a", "2b", "2c", "3a", "3b", "3c"]
