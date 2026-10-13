@@ -272,6 +272,115 @@ def plot_npv_hist_overlaid(site_powers, results_with_different_site_power, scena
     plt.show()
 
 
+def plot_cumulative_npv_grid(results, scenarios):
+    """Plot cumulative NPV and discounted cash flow in a 2D grid.
+
+    Grid layout:
+      - rows correspond to numeric scenario groups (e.g. 1,2,3)
+      - columns correspond to letter cases (e.g. a,b,c)
+
+    `scenarios` is expected to contain labels like ['1a','1b','1c','2a',...],
+    and `results` is the NPV array of a single site mean power (shape:
+    n_samples x n_years+1 x n_scenarios). Each cell matches plot_cumulative_npv:
+    median and 95% interval of the cumulative NPV and of the discounted cash
+    flow. The x-axis is shared per column and the y-axis per row.
+    """
+    parsed = [re.match(r"(\d+)(\D+)", s) for s in scenarios]
+    numbers = []
+    letters = []
+    for m in parsed:
+        if m:
+            numbers.append(m.group(1))
+            letters.append(m.group(2))
+    numbers = list(dict.fromkeys(numbers))
+    letters = list(dict.fromkeys(letters))
+
+    n_rows = len(numbers)
+    n_cols = len(letters)
+    years = np.arange(results.shape[1])
+
+    fig, axs = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(4.5 * n_cols, 3 * n_rows),
+        squeeze=False,
+        sharex="col",
+        sharey="row",
+    )
+
+    for r, num in enumerate(numbers):
+        for c, let in enumerate(letters):
+            ax = axs[r, c]
+            scenario_label = f"{num}{let}"
+
+            if scenario_label not in scenarios:
+                ax.axis("off")
+                continue
+            idx = scenarios.index(scenario_label)
+
+            npvs = results[:, :, idx]
+            discounted_cfs = np.append(
+                npvs[:, :1], npvs[:, 1:] - npvs[:, :-1], axis=1
+            )
+            pct_npv = np.percentile(npvs, [2.5, 50, 97.5], axis=0)
+            pct_cf = np.percentile(discounted_cfs, [2.5, 50, 97.5], axis=0)
+
+            ax.plot(years, pct_npv[1], color="blue")
+            ax.plot(years, pct_npv[::2].T, "--", color="blue")
+            ax.plot(years, pct_cf[1], color="orange")
+            ax.plot(years, pct_cf[::2].T, "--", color="orange")
+
+            if r == 0:
+                ax.set_title(
+                    f"Case {let}",
+                    fontweight="bold",
+                    pad=10,
+                    fontsize=FONT_SIZES["title"],
+                )
+
+            if c == 0:
+                ax.text(
+                    -0.3,
+                    0.5,
+                    f"Scenario {num}",
+                    transform=ax.transAxes,
+                    rotation=90,
+                    verticalalignment="center",
+                    fontweight="bold",
+                    fontsize=FONT_SIZES["row_label"],
+                )
+                ax.set_ylabel("NPV (€)", fontsize=FONT_SIZES["label"])
+
+            if r == n_rows - 1:
+                ax.set_xlabel("Year", fontsize=FONT_SIZES["label"])
+
+            ax.tick_params(axis="x", labelbottom=True)
+            ax.tick_params(axis="both", labelsize=FONT_SIZES["ticks"])
+            ax.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
+            ax.grid(axis="y", alpha=0.5)
+
+    legend_handles = [
+        plt.Line2D([], [], color="blue", label="Median"),
+        plt.Line2D([], [], color="blue", linestyle="--", label="Confidence Interval 95%"),
+        plt.Line2D([], [], color="orange", label="Median Cash Flow"),
+        plt.Line2D(
+            [], [], color="orange", linestyle="--", label="Cash Flow Confidence Interval 95%"
+        ),
+    ]
+    fig.legend(
+        handles=legend_handles,
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.04),
+        ncol=4,
+        fontsize=FONT_SIZES["legend"],
+        frameon=True,
+    )
+
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.09)
+    plt.show()
+
+
 def plot_tornado(sens_params, sens_array, scenario, title=None):
     """Plot a single tornado chart for one scenario.
 
