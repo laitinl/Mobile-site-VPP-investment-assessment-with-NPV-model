@@ -142,7 +142,7 @@ class NPVSimulator:
         # Calculate NPV
         out = self._calculate_npv(cash_flows, discount_rate)
 
-        return out, np.median(cash_flows, axis=0), np.median(revs, axis=0)
+        return out, cash_flows, revs
 
     def _calculate_npv_sensitivity(self, df):
         # Fixed parameters
