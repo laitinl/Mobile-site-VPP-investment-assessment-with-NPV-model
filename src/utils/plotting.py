@@ -3,7 +3,6 @@ import re
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 # Default font sizes tuned for A4 / journal figures
 FONT_SIZES = {
     "title": 16,
@@ -14,8 +13,14 @@ FONT_SIZES = {
 }
 
 
-def plot_cumulative_npv(results, scenario, n_years):
-    percentiles_npv = np.percentile(results[:, :, scenario], [2.5, 50, 97.5], axis=0)
+def plot_cumulative_npv(npvs, scenario, n_years):
+    discounted_cfs = np.append(
+        npvs[:, 0, scenario].reshape(-1, 1),
+        npvs[:, 1:, scenario] - npvs[:, :-1, scenario],
+        axis=1,
+    )
+    percentiles_npv = np.percentile(npvs[:, :, scenario], [2.5, 50, 97.5], axis=0)
+    percentiles_cf = np.percentile(discounted_cfs, [2.5, 50, 97.5], axis=0)
     plt.figure(figsize=(10, 6))
     plt.plot(
         np.arange(0, n_years + 1),
@@ -29,6 +34,19 @@ def plot_cumulative_npv(results, scenario, n_years):
         "--",
         label="Confidence Interval 95%",
         color="blue",
+    )
+    plt.plot(
+        np.arange(0, n_years + 1),
+        percentiles_cf[1],
+        label="Median Cash Flow",
+        color="orange",
+    )
+    plt.plot(
+        np.arange(0, n_years + 1),
+        percentiles_cf[::2, :].T,
+        "--",
+        label="Cash Flow Confidence Interval 95%",
+        color="orange",
     )
     ax = plt.gca()
     ax.set_xlabel("Year", fontsize=FONT_SIZES["label"])
@@ -382,7 +400,9 @@ def plot_tornado_grid(sens_params, sens_array, scenarios, n_params=6, agg="max")
 
             if r == 0 and c == 0:
                 legend_handles.extend([h_plus, h_minus])
-                legend_labels.extend(["Parameter increase 20%", "Parameter decrease 20%"])
+                legend_labels.extend(
+                    ["Parameter increase 20%", "Parameter decrease 20%"]
+                )
 
             # Column titles: letters (cases) on top row
             if r == 0:
