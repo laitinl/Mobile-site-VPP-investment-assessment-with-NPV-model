@@ -2,6 +2,7 @@ import re
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.ticker import FuncFormatter
 
 # Default font sizes tuned for A4 / journal figures
 FONT_SIZES = {
@@ -11,6 +12,11 @@ FONT_SIZES = {
     "legend": 12,
     "row_label": 14,
 }
+
+
+def _to_keur(axis):
+    """Show an axis holding euro values in thousand euros (k€), without e-notation."""
+    axis.set_major_formatter(FuncFormatter(lambda v, _: f"{v / 1e3:g}"))
 
 
 def plot_cumulative_npv(npvs, scenario, n_years):
@@ -50,7 +56,8 @@ def plot_cumulative_npv(npvs, scenario, n_years):
     )
     ax = plt.gca()
     ax.set_xlabel("Year", fontsize=FONT_SIZES["label"])
-    ax.set_ylabel("NPV (€)", fontsize=FONT_SIZES["label"])
+    ax.set_ylabel("NPV (k€)", fontsize=FONT_SIZES["label"])
+    _to_keur(ax.yaxis)
     ax.grid(axis="y", alpha=0.5)
     ax.tick_params(axis="both", labelsize=FONT_SIZES["ticks"])
     ax.legend(fontsize=FONT_SIZES["legend"])
@@ -85,7 +92,8 @@ def plot_npv_boxplots(site_powers, results_with_different_site_power, scenarios)
     ax.set_xticklabels(
         [f"Scenario {s}" for s in scenarios], fontsize=FONT_SIZES["ticks"]
     )
-    ax.set_ylabel("NPV (€)", fontsize=FONT_SIZES["label"])
+    ax.set_ylabel("NPV (k€)", fontsize=FONT_SIZES["label"])
+    _to_keur(ax.yaxis)
     ax.grid(axis="y", alpha=0.5)
     ax.tick_params(axis="y", labelsize=FONT_SIZES["ticks"])
     ax.legend(fontsize=FONT_SIZES["legend"])
@@ -103,7 +111,7 @@ def plot_npv_hist_grid(site_powers, results_with_different_site_power, scenarios
     for i, scenario in enumerate(scenarios):
         for j, results in enumerate(results_with_different_site_power):
             ax = axs[j, i]
-            ax.hist(results[:, -1, i], bins=500, density=True, alpha=0.7)
+            ax.hist(results[:, -1, i] / 1e3, bins=500, density=True, alpha=0.7)
             ax.grid(axis="y", alpha=0.5)
 
             # Add column titles (scenarios) only on the top row
@@ -134,7 +142,9 @@ def plot_npv_hist_grid(site_powers, results_with_different_site_power, scenarios
 
             # Add xlabel only on the bottom row
             if j == n_site_powers - 1:
-                ax.set_xlabel("NPV (€)", fontsize=FONT_SIZES["label"])
+                ax.set_xlabel("NPV (k€)", fontsize=FONT_SIZES["label"])
+
+            ax.ticklabel_format(style="plain", axis="both")
 
             # tick sizes
             ax.tick_params(axis="both", labelsize=FONT_SIZES["ticks"])
@@ -198,7 +208,7 @@ def plot_npv_hist_overlaid(site_powers, results_with_different_site_power, scena
             for j, results in enumerate(results_with_different_site_power):
                 color = colors[j]
                 h = ax.hist(
-                    results[:, -1, idx],
+                    results[:, -1, idx] / 1e3,
                     bins=100,
                     density=True,
                     alpha=0.6,
@@ -240,16 +250,15 @@ def plot_npv_hist_overlaid(site_powers, results_with_different_site_power, scena
 
             # xlabel only on bottom row
             if r == n_rows - 1:
-                ax.set_xlabel("NPV (€)", fontsize=FONT_SIZES["label"])
+                ax.set_xlabel("NPV (k€)", fontsize=FONT_SIZES["label"])
 
             # make x-tick labels visible for all rows (they're shared per column)
             ax.tick_params(axis="x", labelbottom=True)
             # set tick label sizes for both axes
             ax.tick_params(axis="both", labelsize=FONT_SIZES["ticks"])
 
-            # use scientific notation for both axes (e.g. 120 -> 1.2e2)
-            ax.ticklabel_format(style="sci", axis="x", scilimits=(0, 0))
-            ax.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
+            # plain tick labels, no scientific notation
+            ax.ticklabel_format(style="plain", axis="both")
 
             ax.grid(axis="y", alpha=0.5)
 
@@ -349,14 +358,14 @@ def plot_cumulative_npv_grid(results, scenarios):
                     fontweight="bold",
                     fontsize=FONT_SIZES["row_label"],
                 )
-                ax.set_ylabel("NPV (€)", fontsize=FONT_SIZES["label"])
+                ax.set_ylabel("NPV (k€)", fontsize=FONT_SIZES["label"])
 
             if r == n_rows - 1:
                 ax.set_xlabel("Year", fontsize=FONT_SIZES["label"])
 
             ax.tick_params(axis="x", labelbottom=True)
             ax.tick_params(axis="both", labelsize=FONT_SIZES["ticks"])
-            ax.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
+            _to_keur(ax.yaxis)
             ax.grid(axis="y", alpha=0.5)
 
     legend_handles = [
@@ -404,7 +413,8 @@ def plot_tornado(sens_params, sens_array, scenario, title=None):
     ax.set_yticklabels(param_labels, fontsize=FONT_SIZES["ticks"])
     ax.legend(fontsize=FONT_SIZES["legend"])
     ax.set_title(title, fontsize=FONT_SIZES["title"])
-    ax.set_xlabel("NPV change (€)", fontsize=FONT_SIZES["label"])
+    ax.set_xlabel("NPV change (k€)", fontsize=FONT_SIZES["label"])
+    _to_keur(ax.xaxis)
     ax.tick_params(axis="x", labelsize=FONT_SIZES["ticks"])
     plt.show()
 
@@ -541,8 +551,9 @@ def plot_tornado_grid(sens_params, sens_array, scenarios, n_params=6, agg="max")
 
             # xlabel only on bottom row
             if r == n_rows - 1:
-                ax.set_xlabel("NPV change (€)", fontsize=FONT_SIZES["label"])
+                ax.set_xlabel("NPV change (k€)", fontsize=FONT_SIZES["label"])
 
+            _to_keur(ax.xaxis)
             ax.tick_params(axis="x", labelsize=FONT_SIZES["ticks"])
 
     if legend_handles:
