@@ -58,6 +58,7 @@ def plot_cumulative_npv(npvs, scenario, n_years):
     ax.set_xlabel("Year", fontsize=FONT_SIZES["label"])
     ax.set_ylabel("NPV (k€)", fontsize=FONT_SIZES["label"])
     _to_keur(ax.yaxis)
+    ax.axhline(0, color="black", linewidth=1.5, zorder=1)
     ax.grid(axis="y", alpha=0.5)
     ax.tick_params(axis="both", labelsize=FONT_SIZES["ticks"])
     ax.legend(fontsize=FONT_SIZES["legend"])
@@ -366,6 +367,7 @@ def plot_cumulative_npv_grid(results, scenarios):
             ax.tick_params(axis="x", labelbottom=True)
             ax.tick_params(axis="both", labelsize=FONT_SIZES["ticks"])
             _to_keur(ax.yaxis)
+            ax.axhline(0, color="black", linewidth=1.5, zorder=1)
             ax.grid(axis="y", alpha=0.5)
 
     legend_handles = [
