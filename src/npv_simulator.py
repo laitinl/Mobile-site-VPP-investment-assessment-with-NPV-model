@@ -269,7 +269,7 @@ class NPVSimulator:
             df_plus[param_name] *= 1.2
             df_minus = df_params.copy()
             df_minus[param_name] *= 0.8
-            sens_array[i, 0, :] = self._calculate_npv_sensitivity(df_plus) - base_npv
-            sens_array[i, 1, :] = self._calculate_npv_sensitivity(df_minus) - base_npv
+            sens_array[i, 0, :] = (self._calculate_npv_sensitivity(df_plus) - base_npv)/np.abs(base_npv) * 100
+            sens_array[i, 1, :] = (self._calculate_npv_sensitivity(df_minus) - base_npv)/np.abs(base_npv) * 100
 
         return param_names, sens_array
