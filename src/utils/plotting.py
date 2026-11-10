@@ -41,17 +41,11 @@ def plot_cumulative_npv(npvs, scenario, n_years):
         label="Confidence Interval 95%",
         color="blue",
     )
-    plt.plot(
+    plt.bar(
         np.arange(0, n_years + 1),
         percentiles_cf[1],
+        width=0.6,
         label="Median Cash Flow",
-        color="orange",
-    )
-    plt.plot(
-        np.arange(0, n_years + 1),
-        percentiles_cf[::2, :].T,
-        "--",
-        label="Cash Flow Confidence Interval 95%",
         color="orange",
     )
     ax = plt.gca()
@@ -337,8 +331,7 @@ def plot_cumulative_npv_grid(results, scenarios):
 
             ax.plot(years, pct_npv[1], color="blue")
             ax.plot(years, pct_npv[::2].T, "--", color="blue")
-            ax.plot(years, pct_cf[1], color="orange")
-            ax.plot(years, pct_cf[::2].T, "--", color="orange")
+            ax.bar(years, pct_cf[1], width=0.6, color="orange")
 
             if r == 0:
                 ax.set_title(
@@ -373,16 +366,13 @@ def plot_cumulative_npv_grid(results, scenarios):
     legend_handles = [
         plt.Line2D([], [], color="blue", label="Median"),
         plt.Line2D([], [], color="blue", linestyle="--", label="Confidence Interval 95%"),
-        plt.Line2D([], [], color="orange", label="Median Cash Flow"),
-        plt.Line2D(
-            [], [], color="orange", linestyle="--", label="Cash Flow Confidence Interval 95%"
-        ),
+        plt.Rectangle((0, 0), 1, 1, color="orange", label="Median Cash Flow"),
     ]
     fig.legend(
         handles=legend_handles,
         loc="lower center",
         bbox_to_anchor=(0.5, -0.04),
-        ncol=4,
+        ncol=3,
         fontsize=FONT_SIZES["legend"],
         frameon=True,
     )
@@ -415,7 +405,7 @@ def plot_tornado(sens_params, sens_array, scenario, title=None):
     ax.set_yticklabels(param_labels, fontsize=FONT_SIZES["ticks"])
     ax.legend(fontsize=FONT_SIZES["legend"])
     ax.set_title(title, fontsize=FONT_SIZES["title"])
-    ax.set_xlabel("NPV change (k€)", fontsize=FONT_SIZES["label"])
+    ax.set_xlabel("NPV change (%)", fontsize=FONT_SIZES["label"])
     _to_keur(ax.xaxis)
     ax.tick_params(axis="x", labelsize=FONT_SIZES["ticks"])
     plt.show()
@@ -553,7 +543,7 @@ def plot_tornado_grid(sens_params, sens_array, scenarios, n_params=6, agg="max")
 
             # xlabel only on bottom row
             if r == n_rows - 1:
-                ax.set_xlabel("NPV change (k€)", fontsize=FONT_SIZES["label"])
+                ax.set_xlabel("NPV change (%)", fontsize=FONT_SIZES["label"])
 
             _to_keur(ax.xaxis)
             ax.tick_params(axis="x", labelsize=FONT_SIZES["ticks"])
