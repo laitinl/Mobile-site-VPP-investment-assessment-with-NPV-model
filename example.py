@@ -5,7 +5,6 @@ from src.npv_simulator import NPVSimulator
 from src.utils.plotting import (
     plot_cumulative_npv,
     plot_cumulative_npv_grid,
-    plot_npv_hist_grid,
     plot_npv_boxplots,
     plot_npv_hist_overlaid,
     plot_tornado,
@@ -15,16 +14,16 @@ from src.utils.plotting import (
 cases = {
     "Investment_size": np.array([0, 1, 3, 0, 1, 3, 0, 1, 3]),  # Extra capacity hours
     "FFR yield": np.array(
-        [0, 0, 0, 19454, 19454, 19454, 19454, 19454, 19454]
+        [0, 0, 0, 24476, 24476, 24476, 24476, 24476, 24476]
     ),  # Yield from FFR up market €/MW/year
     "FCR-D yield": np.array(
-        [0, 0, 0, 0, 54869, 12569, 0, 54869, 12569]
+        [0, 0, 0, 0, 59376, 16600, 0, 59376, 16600]
     ),  # Yield from FCR-D up and downmarket €/MW/year
     "aFRR yield": np.array(
-        [0, 0, 0, 0, 0, 45539, 0, 0, 45539]
+        [0, 0, 0, 0, 0, 49620, 0, 0, 49620]
     ),  # Yield from aFRR up and downmarket €/MW/year
     "LS savings": np.array(
-        [0, 21049, 59718, 0, 3409, 36664, 0, 3409, 36664]
+        [0, 19999, 57184, 0, 2884, 31293, 0, 2884, 31293]
     ),  # Savings from load shifting €/MW/year
     "Controller": np.array(
         [False, False, False, False, False, False, True, True, True]
@@ -44,7 +43,7 @@ config = {
         500,
         25,
     ),  # Installation cost per site (fixed cost, variable cost per kWh)
-    "vpp_controller_cost": (250, 500, 750),  # Cost for VPP controller per
+    "vpp_controller_cost": (250, 500, 1500),  # Cost for VPP controller per
     "ffr_weight": 1,  # Weight of FFR revenues
     "fcr_weight": 1,  # Weight of FCR revenues
     "afrr_weight": 1,  # Weight of aFRR revenues
@@ -126,7 +125,7 @@ def main():
     results, cf, revs = simulator.run_uncertainty_analysis(count=1000000)
     results_with_different_site_power.append(results)
 
-    config["site_mean_power"] = 15
+    config["site_mean_power"] = 50
     simulator = NPVSimulator(cases, config)
     results, cf, revs = simulator.run_uncertainty_analysis(count=1000000)
     results_with_different_site_power.append(results)
@@ -140,13 +139,13 @@ def main():
     ]
 
     plot_npv_boxplots(
-        site_powers=[2.5, 5, 7.5, 15],
+        site_powers=[2.5, 5, 7.5, 50],
         results_with_different_site_power=results_with_different_site_power,
         scenarios=scenarios,
     )
 
     plot_npv_hist_overlaid(
-        site_powers=[2.5, 5, 7.5, 15],
+        site_powers=[2.5, 5, 7.5, 50],
         results_with_different_site_power=results_with_different_site_power,
         scenarios=scenarios,
     )
