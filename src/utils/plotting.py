@@ -411,7 +411,7 @@ def plot_tornado(sens_params, sens_array, scenario, title=None):
     plt.show()
 
 
-def plot_tornado_grid(sens_params, sens_array, scenarios, n_params=6, agg="max"):
+def plot_tornado_grid(sens_params, sens_array, scenarios, row_params):
     """Plot tornado charts for all scenarios in a single grid of subplots.
 
     Grid layout:
@@ -423,22 +423,12 @@ def plot_tornado_grid(sens_params, sens_array, scenarios, n_params=6, agg="max")
     n_scenarios, with index 0 the +20% sensitivity and index 1 the -20%
     sensitivity, as produced by NPVSimulator.run_sensitivity_analysis).
 
-    Each row shares a y-axis (parameter list), so a subplot's ranking can't
-    vary case to case within a row. To keep that shared axis readable, only
-    the `n_params` parameters most sensitive within the row are shown.
-
-    Cases can have very different NPV magnitudes (e.g. a larger investment
-    size), which would let a single high-magnitude case dominate a raw
-    |sens_plus - sens_minus| comparison. To stay scale-independent, each
-    case first ranks its own parameters by sensitivity (1 = most sensitive
-    in that case), and those per-case ranks are aggregated across the row's
-    cases with `agg` ("max" takes the best rank a parameter reaches in any
-    case, "mean"/"sum" reward parameters that rank highly across all
-    cases).
+    `row_params` chooses the parameters (y-axis) shown in each row. Either:
+      - a list of parameter-name lists, one per row in order, or
+      - a dict mapping the row's scenario number (e.g. "1") to its list.
+    Parameters are drawn top to bottom in the order given, and must be names
+    from `sens_params`.
     """
-    agg_funcs = {"max": np.max, "mean": np.mean, "sum": np.sum}
-    agg_func = agg_funcs[agg]
-
     # Extract numeric row keys and letter column keys from scenario strings
     parsed = [re.match(r"(\d+)(\D+)", s) for s in scenarios]
     numbers = []
@@ -454,41 +444,35 @@ def plot_tornado_grid(sens_params, sens_array, scenarios, n_params=6, agg="max")
     n_cols = len(letters)
 
     sens_params = np.asarray(sens_params)
-    n_params_total = len(sens_params)
-    delta = np.abs(sens_array[:, 0, :] - sens_array[:, 1, :])  # (n_params, n_scenarios)
+    param_index = {name: i for i, name in enumerate(sens_params)}
 
-    # Rank parameters within each scenario column (1 = most sensitive), then
-    # flip to a score where larger is more sensitive so it can be aggregated
-    # with the same max/mean/sum logic used for the row selection below.
-    order = np.argsort(-delta, axis=0)
-    ranks = np.empty_like(order)
-    for j in range(order.shape[1]):
-        ranks[order[:, j], j] = np.arange(1, n_params_total + 1)
-    sensitivity_score = n_params_total - ranks
+    if isinstance(row_params, dict):
+        row_params = [row_params[num] for num in numbers]
+    elif len(row_params) != n_rows:
+        raise ValueError(
+            f"row_params has {len(row_params)} entries but there are {n_rows} rows"
+        )
+    for names in row_params:
+        unknown = [n for n in names if n not in param_index]
+        if unknown:
+            raise ValueError(f"Unknown sensitivity parameters: {unknown}")
+    max_row_params = max(len(names) for names in row_params)
 
     fig, axs = plt.subplots(
         n_rows,
         n_cols,
-        figsize=(4.5 * n_cols, max(2.5, 0.4 * n_params) * n_rows),
+        figsize=(4.5 * n_cols, max(2.5, 0.4 * max_row_params) * n_rows),
         squeeze=False,
         sharey="row",
+        sharex="row",
     )
 
     legend_handles = []
     legend_labels = []
 
     for r, num in enumerate(numbers):
-        # Scenario indices present for this row, used to rank parameters
-        row_indices = [
-            scenarios.index(f"{num}{let}")
-            for let in letters
-            if f"{num}{let}" in scenarios
-        ]
-        row_sensitivity = agg_func(sensitivity_score[:, row_indices], axis=1)
-        # Most sensitive n_params, ordered ascending so the largest bar sits
-        # at the top of the barh (matches the original tornado convention)
-        top_params = np.argsort(row_sensitivity)[::-1][:n_params]
-        order_idx = top_params[np.argsort(row_sensitivity[top_params])]
+        # Reverse so the first listed parameter sits at the top of the barh
+        order_idx = np.array([param_index[n] for n in row_params[r]][::-1], dtype=int)
         y_pos = np.arange(len(order_idx))
         param_labels = sens_params[order_idx]
 

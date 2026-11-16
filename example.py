@@ -11,6 +11,35 @@ from src.utils.plotting import (
     plot_tornado_grid,
 )
 
+# Sensitivity parameters shown on the y-axis of each tornado grid row
+TORNADO_PARAMS = [[
+    "ls_weight",
+    "battery_capacity_cost",
+    "site_mean_power",
+    "fixed_battery_installation_cost",
+    "variable_battery_installation_cost",
+    "connectivity_cost",
+],
+[
+    "afrr_weight",
+    "fcr_weight",
+    "ffr_weight",
+    "ls_weight",
+    "battery_capacity_cost",
+    "site_mean_power",
+    "discount_rate",
+],
+[
+    "afrr_weight",
+    "fcr_weight",
+    "ffr_weight",
+    "ls_weight",
+    "battery_capacity_cost",
+    "site_mean_power",
+    "discount_rate",
+    "vpp_controller_cost",
+]]
+
 cases = {
     "Investment_size": np.array([0, 1, 3, 0, 1, 3, 0, 1, 3]),  # Extra capacity hours
     "FFR yield": np.array(
@@ -83,7 +112,12 @@ def main():
     scenarios = ["1a", "1b", "1c", "2a", "2b", "2c", "3a", "3b", "3c"]
     for i in range(len(scenarios)):
         plot_tornado(sens_params, sens_array, i, title=f"Scenario {scenarios[i]}")
-    plot_tornado_grid(sens_params, sens_array, scenarios)
+    plot_tornado_grid(
+        sens_params,
+        sens_array,
+        scenarios,
+        row_params=TORNADO_PARAMS,
+    )
 
     results_with_different_site_power = []
     results, cf, revs = simulator.run_uncertainty_analysis(count=3000000)
@@ -157,7 +191,12 @@ def analysis():
     scenarios = ["1a", "1b", "1c", "2a", "2b", "2c", "3a", "3b", "3c"]
     for i in range(len(scenarios)):
         plot_tornado(sens_params, sens_array, i, title=f"Scenario {scenarios[i]}")
-    plot_tornado_grid(sens_params, sens_array, scenarios)
+    plot_tornado_grid(
+        sens_params,
+        sens_array,
+        scenarios,
+        row_params=[TORNADO_PARAMS] * 3,  # one parameter list per scenario row
+    )
 
     results_with_different_site_power = []
     results, cf, revs = simulator.run_uncertainty_analysis(count=1000000)
