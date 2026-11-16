@@ -406,7 +406,6 @@ def plot_tornado(sens_params, sens_array, scenario, title=None):
     ax.legend(fontsize=FONT_SIZES["legend"])
     ax.set_title(title, fontsize=FONT_SIZES["title"])
     ax.set_xlabel("NPV change (%)", fontsize=FONT_SIZES["label"])
-    _to_keur(ax.xaxis)
     ax.tick_params(axis="x", labelsize=FONT_SIZES["ticks"])
     plt.show()
 
@@ -529,7 +528,6 @@ def plot_tornado_grid(sens_params, sens_array, scenarios, row_params):
             if r == n_rows - 1:
                 ax.set_xlabel("NPV change (%)", fontsize=FONT_SIZES["label"])
 
-            _to_keur(ax.xaxis)
             ax.tick_params(axis="x", labelsize=FONT_SIZES["ticks"])
 
     if legend_handles:
